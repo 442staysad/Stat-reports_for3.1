@@ -1,0 +1,28 @@
+﻿@model Core.DTO.ReportDto
+
+@{
+    ViewData["Title"] = "Редактирование отчета";
+}
+
+<h2>Редактирование отчета</h2>
+
+<form asp-action="Edit" method="post">
+    <input type="hidden" name="Id" value="@Model.Id" />
+
+    <div class="form-group">
+        <label for="Name">Название отчета</label>
+        <input type="text" class="form-control" name="Name" value="@Model.Name" required />
+    </div>
+
+    <div class="form-group">
+        <label for="Status">Статус</label>
+        <select class="form-control" name="Status">
+            <option value="Draft" selected="@(Model.Status.ToString() == "Draft")">Черновик</option>
+            <option value="Reviewed" selected="@(Model.Status.ToString() == "Reviewed")">Проверено</option>
+            <option value="NeedsCorrection" selected="@(Model.Status.ToString() == "NeedsCorrection")">Необходима корректировка</option>
+            <option value="InProgress" selected="@(Model.Status.ToString() == "InProgress")">В работе</option>
+        </select>
+    </div>
+    <button type="submit" class="btn btn-success">Сохранить</button>
+</form>
+<a href="@Url.Action("Index", "ReportMvc")">Вернуться к списку отчетов</a>

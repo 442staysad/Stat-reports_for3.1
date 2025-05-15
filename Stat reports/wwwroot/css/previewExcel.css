@@ -1,0 +1,118 @@
+﻿/* Стили для навигации по вкладкам (листам Excel) */
+#excelTabNav { /* Используем ID для повышения специфичности */
+    list-style-type: none;
+    padding-left: 0;
+    margin-bottom: 0;
+    border-bottom: 2px solid #007bff;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+    #excelTabNav .nav-item {
+        margin-bottom: -2px;
+    }
+
+    #excelTabNav .nav-link { /* Используем ID */
+        border: 1px solid #ccc;
+        border-bottom: none;
+        border-top-left-radius: .35rem;
+        border-top-right-radius: .35rem;
+        padding: 0.6rem 1.1rem;
+        color: #000000; /* ТЕКСТ НЕАКТИВНЫХ ВКЛАДОК - ЧЕРНЫЙ */
+        text-decoration: none;
+        cursor: pointer;
+        background-color: #000000;
+        margin-right: 3px;
+        font-weight: 500;
+        transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+    }
+
+        #excelTabNav .nav-link:hover, /* Используем ID */
+        #excelTabNav .nav-link:focus { /* Используем ID */
+            background-color: #e0e0e0;
+            color: #000000; /* Текст при наведении на неактивную вкладку остается черным */
+            border-color: #b0b0b0;
+            border-bottom: none;
+        }
+
+        #excelTabNav .nav-link.active { /* Используем ID */
+            color: #000000; /* Текст активной вкладки - ЧЕРНЫЙ */
+            background-color: #fff;
+            border-color: #007bff #007bff #fff;
+            border-width: 2px;
+            border-bottom-color: #fff;
+            font-weight: bold;
+        }
+
+/* Стили для содержимого листа */
+.sheet-content {
+    display: none;
+    padding: 1.5rem;
+    border: 1px solid #007bff;
+    border-top: none;
+    background-color: #fff;
+    margin-top: -1px;
+}
+
+    .sheet-content.active {
+        display: block;
+    }
+
+    .sheet-content h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.2rem;
+        color: #333;
+        font-weight: normal;
+    }
+
+    .sheet-content table {
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+        width: 100%;
+        background-color: #fff;
+    }
+
+    .sheet-content th,
+    .sheet-content td {
+        border: 1px solid #b0b0b0;
+        padding: 5px 10px;
+        white-space: nowrap;
+        background-color: #fff;
+        text-align: left;
+        color: #000000;
+        font-size: 0.9rem;
+    }
+
+    .sheet-content th {
+        background-color: #e9ecef;
+        font-weight: bold;
+        color: #000000;
+    }
+
+.scrollable-wrapper {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.excel-viewer-container {
+    margin-top: 1rem;
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: .35rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, .075);
+}
+
+    .excel-viewer-container > h4 {
+        color: #000000 !important;
+        font-weight: bold !important;
+        font-size: 1.4rem;
+        margin-bottom: 0.8rem;
+    }
+
+#loadingMessage {
+    padding: 20px;
+    text-align: center;
+    font-style: italic;
+    color: #555;
+}

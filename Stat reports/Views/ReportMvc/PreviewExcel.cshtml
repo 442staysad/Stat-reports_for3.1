@@ -1,0 +1,314 @@
+﻿@model Stat_reports.ViewModels.ExcelPreviewViewModel
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    var role = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
+    // bool isAdminOrHeadOffice = true; // Ваша логика определения роли
+    int? branchId = HttpContextAccessor.HttpContext?.Session?.GetInt32("BranchId");
+}
+
+
+@section Styles {
+    <style>
+        /* Стили для навигации по вкладкам (листам Excel) */
+        #excelTabNav { /* Используем ID для повышения специфичности */
+            list-style-type: none;
+            padding-left: 0;
+            margin-bottom: 0;
+            border-bottom: 2px solid #007bff;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        #excelTabNav .nav-item {
+            margin-bottom: -2px;
+        }
+
+        #excelTabNav .nav-link { /* Используем ID */
+            border: 1px solid #ccc;
+            border-bottom: none;
+            border-top-left-radius: .35rem;
+            border-top-right-radius: .35rem;
+            padding: 0.6rem 1.1rem;
+            color: #000000; /* ТЕКСТ НЕАКТИВНЫХ ВКЛАДОК - ЧЕРНЫЙ */
+            text-decoration: none;
+            cursor: pointer;
+            background-color: #000000;
+            margin-right: 3px;
+            font-weight: 500;
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+
+        #excelTabNav .nav-link:hover, /* Используем ID */
+        #excelTabNav .nav-link:focus { /* Используем ID */
+            background-color: #e0e0e0;
+            color: #000000; /* Текст при наведении на неактивную вкладку остается черным */
+            border-color: #b0b0b0;
+            border-bottom: none;
+        }
+
+        #excelTabNav .nav-link.active { /* Используем ID */
+            color: #000000; /* Текст активной вкладки - ЧЕРНЫЙ */
+            background-color: #fff;
+            border-color: #007bff #007bff #fff;
+            border-width: 2px;
+            border-bottom-color: #fff;
+            font-weight: bold;
+        }
+
+        /* Стили для содержимого листа */
+        .sheet-content {
+            display: none;
+            padding: 1.5rem;
+            border: 1px solid #007bff;
+            border-top: none;
+            background-color: #fff;
+            margin-top: -1px;
+        }
+
+        .sheet-content.active {
+            display: block;
+        }
+
+        .sheet-content h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            color: #333;
+            font-weight: normal;
+        }
+
+        .sheet-content table {
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+            width: 100%;
+            background-color: #fff;
+        }
+
+        .sheet-content th,
+        .sheet-content td {
+            border: 1px solid #b0b0b0;
+            padding: 5px 10px;
+            white-space: nowrap;
+            background-color: #fff;
+            text-align: left;
+            color: #000000;
+            font-size: 0.9rem;
+        }
+
+        .sheet-content th {
+            background-color: #e9ecef;
+            font-weight: bold;
+            color: #000000;
+        }
+
+        .scrollable-wrapper {
+            overflow-x: auto;
+            width: 100%;
+        }
+
+        .excel-viewer-container {
+            margin-top: 1rem;
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: .35rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, .075);
+        }
+
+        .excel-viewer-container > h4 {
+            color: #000000 !important;
+            font-weight: bold !important;
+            font-size: 1.4rem;
+            margin-bottom: 0.8rem;
+        }
+
+        #loadingMessage {
+            padding: 20px;
+            text-align: center;
+            font-style: italic;
+            color: #555;
+        }
+    </style>
+}
+
+<div class="container-xl">
+    <div class="header">
+        <h2 class="mb-3">Просмотр отчета: <strong>@Model.BranchName @Model.ReportName</strong></h2>
+    </div>
+
+    @if (!Model.IsArchive && (Model.ReportType == role || User.IsInRole("Admin")))
+    {
+        <div class="action-section">
+            <h4 class="mb-3">Действия с отчетом</h4>
+            <form asp-action="AddComment" method="post" class="mb-4">
+                <input type="hidden" name="deadlineId" value="@Model.DeadlineId" />
+                <input type="hidden" name="reportId" value="@Model.ReportId" />
+                <div class="mb-3">
+                    <label for="comment" class="form-label">Комментарий</label>
+                    <textarea class="form-control" id="comment" name="comment" rows="3"
+                              placeholder="Введите ваш комментарий..." required>@Model.Comment</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Сохранить комментарий</button>
+            </form>
+
+            <div class="d-flex gap-2">
+                <form asp-action="AcceptReport" method="post" class="mb-2">
+                    <input type="hidden" name="deadlineId" value="@Model.DeadlineId" />
+                    <input type="hidden" name="reportId" value="@Model.ReportId" />
+                    <button type="submit" class="btn btn-success">Принять отчет</button>
+                </form>
+
+            </div>
+        </div>
+    }
+    <div class="mt-5">
+        <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#commentHistoryModal">
+            История комментариев
+        </button>
+    </div>
+    <div class="excel-viewer-container mt-4">
+        <h4 class="ps-3 pt-3">Содержимое отчета:</h4>
+        <ul class="excel-tabs px-3" id="excelTabNav">
+        </ul>
+
+        <div id="excelSheetContentArea">
+            <div id="loadingMessage" class="p-3">Загрузка отчета...</div>
+        </div>
+    </div>
+
+</div>
+
+<div class="modal fade" id="commentHistoryModal" tabindex="-1" aria-labelledby="commentHistoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="commentHistoryModalLabel">История комментариев</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                @if (Model.CommentHistory != null && Model.CommentHistory.Any())
+                {
+                    <ul class="list-group">
+                        @foreach (var comment in Model.CommentHistory.OrderByDescending(c => c.CreatedAt))
+                        {
+                            <li class="list-group-item">
+                                <strong>@comment.AuthorName</strong>
+                                <small class="text-muted">@comment.CreatedAt.ToString("g")</small>
+                                <p class="mb-0">@comment.Comment</p>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="text-muted">На текущий момент нет комментариев.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const reportId = @Model.ReportId;
+            const excelTabNav = document.getElementById('excelTabNav');
+            const excelSheetContentArea = document.getElementById('excelSheetContentArea');
+            const loadingMessage = document.getElementById('loadingMessage');
+
+            fetch(`@Url.Action("DownloadExcelForView", "ReportMvc")?reportId=${reportId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Ошибка сети: ${response.statusText}`);
+                    }
+                    return response.arrayBuffer();
+                })
+                .then(data => {
+                    if (loadingMessage) loadingMessage.style.display = 'none';
+                    excelSheetContentArea.innerHTML = ''; // Очищаем предыдущее содержимое (например, сообщение о загрузке)
+
+                    const wb = XLSX.read(new Uint8Array(data), { type: 'array', cellStyles: true });
+
+                    if (!wb.SheetNames || wb.SheetNames.length === 0) {
+                        excelSheetContentArea.innerHTML = '<p class="p-3 text-danger">Файл Excel не содержит листов или пуст.</p>';
+                        return;
+                    }
+
+                    // Сохраняем HTML для каждого листа
+                    const sheetHtmlContents = {};
+
+                    wb.SheetNames.forEach((name, index) => {
+                        // Создаем вкладку
+                        const tabItem = document.createElement('li');
+                        tabItem.classList.add('nav-item');
+
+                        const tabLink = document.createElement('a');
+                        tabLink.classList.add('nav-link');
+                        if (index === 0) {
+                            tabLink.classList.add('active'); // Первая вкладка активна по умолчанию
+                        }
+                        // tabLink.href = `#`; // Не используем href для предотвращения перехода
+                        tabLink.textContent = name;
+                        tabLink.dataset.sheetName = name; // Сохраняем имя листа для идентификации
+
+                        tabItem.appendChild(tabLink);
+                        excelTabNav.appendChild(tabItem);
+
+                        // Генерируем и сохраняем HTML для листа
+                        const sheet = wb.Sheets[name];
+                        const sheetContentDiv = document.createElement('div');
+                        sheetContentDiv.classList.add('sheet-content');
+                        // Не добавляем 'active' класс здесь, сделаем это после создания всех вкладок
+
+                        // Обертка для прокрутки
+                        const scrollWrapper = document.createElement('div');
+                        scrollWrapper.classList.add('scrollable-wrapper');
+
+                        const htmlStr = XLSX.utils.sheet_to_html(sheet, {
+                            editable: false,
+                            header: "", // Пустой заголовок, если не нужен стандартный
+                        });
+                        scrollWrapper.innerHTML = htmlStr;
+                        sheetContentDiv.appendChild(scrollWrapper);
+                        sheetHtmlContents[name] = sheetContentDiv; // Сохраняем div с содержимым
+
+                        // Если это первый лист, отображаем его содержимое
+                        if (index === 0) {
+                            sheetContentDiv.classList.add('active');
+                            excelSheetContentArea.appendChild(sheetContentDiv);
+                        }
+                    });
+
+                    // Обработчик кликов по вкладкам
+                    excelTabNav.addEventListener('click', function (e) {
+                        if (e.target && e.target.classList.contains('nav-link')) {
+                            e.preventDefault();
+                            const clickedSheetName = e.target.dataset.sheetName;
+
+                            // Убираем класс 'active' у всех вкладок и скрываем все содержимое
+                            excelTabNav.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+                            excelSheetContentArea.innerHTML = ''; // Очищаем область содержимого
+
+                            // Активируем кликнутую вкладку
+                            e.target.classList.add('active');
+
+                            // Отображаем соответствующее содержимое листа
+                            if (sheetHtmlContents[clickedSheetName]) {
+                                excelSheetContentArea.appendChild(sheetHtmlContents[clickedSheetName]);
+                                // Убедимся, что контейнер активного листа видим (хотя он уже должен быть, если мы его только что добавили)
+                                sheetHtmlContents[clickedSheetName].classList.add('active');
+                            }
+                        }
+                    });
+
+                })
+                .catch(err => {
+                    if (loadingMessage) loadingMessage.style.display = 'none';
+                    excelSheetContentArea.innerHTML = `<p class="p-3 text-danger">Не удалось загрузить или обработать отчёт: ${err.message}</p>`;
+                    console.error("Ошибка при загрузке/обработке Excel файла:", err);
+                });
+        });
+    </script>
+}

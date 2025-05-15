@@ -1,0 +1,247 @@
+﻿@model Stat_reports.ViewModels.ReportArchiveViewModel
+@{
+    ViewData["Title"] = "Архив отчетов";
+}
+@section Styles {
+<link rel="stylesheet" href="~/css/archive.css" />
+<style>
+    /* Добавьте стиль для скрытия групп полей */
+    .archive-period-group {
+        display: none;
+    }
+</style>
+}
+
+<div class="archive-container">
+    <h2 class="text-center mb-4">📦 @ViewData["Title"]</h2>
+    <form method="get" asp-action="ReportArchive" class="row g-3 mb-4">
+        <div class="col-md-3">
+            <label for="name" class="form-label">Название отчета</label>
+            <input type="text" class="form-control" id="name" name="name" value="@Model.Filter.Name" placeholder="Введите название" />
+        </div>
+        <div class="col-md-3">
+            <label for="reportType" class="form-label">Тип отчета</label>
+            <select class="form-select" id="reportType" name="reportType">
+                <option value="">Все</option>
+                <option value="Plan" selected="@(Model.Filter.Type?.ToString() == "Plan")">Плановый</option>
+                <option value="Accountant" selected="@(Model.Filter.Type?.ToString() == "Accountant")">Бухгалтерский</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="templateId" class="form-label">Шаблон отчета</label>
+            <select class="form-select" id="templateId" name="templateId">
+                <option value="">Все</option>
+                @foreach (var template in Model.Templates)
+                {
+                    <option value="@template.Id"
+                            data-type="@template.Type"
+                            data-period-type="@template.DeadlineType" 
+                            selected="@(template.Id == Model.Filter.TemplateId)">
+                        @template.Name
+                    </option>
+                }
+            </select>
+        </div>
+        @if (User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF"))
+        {
+            <div class="col-md-3">
+                <label for="branchId" class="form-label">Филиал</label>
+                <select class="form-select" id="branchId" name="branchId">
+                    <option value="">Все</option>
+                    @foreach (var branch in Model.Branches)
+                    {
+                        <option value="@branch.Id" selected="@(branch.Id == Model.Filter.BranchId)">@branch.Name</option>
+                    }
+                </select>
+            </div>
+        }
+        else if (User.IsInRole("User"))
+        {
+            <div class="col-md-3">
+                <label for="branchId" class="form-label">Филиал</label>
+                @* Для пользователя с ролью User, поле филиала может быть disabled, но его значение все равно нужно передавать в форме. *@
+                @* Используем скрытое поле для значения и select для отображения. *@
+                @if (Model.Branches.Any(b => b.Id == Model.Filter.BranchId))
+                {
+                    var userBranch = Model.Branches.FirstOrDefault(b => b.Id == Model.Filter.BranchId);
+                    <input type="hidden" name="branchId" value="@userBranch.Id" />
+                    <select class="form-select" id="branchId" disabled>
+                         <option value="@userBranch.Id" selected>@userBranch.Name</option>
+                    </select>
+                }
+                else
+                {
+                     @* Если по какой-то причине у User нет филиала в Filter.BranchId,
+                        можно добавить пустой disabled select или сообщение *@
+                    <select class="form-select" id="branchId" disabled>
+                         <option value="">Не определен</option>
+                    </select>
+                }
+            </div>
+        }
+
+
+        <div id="archive-year-group" class="col-md-3 archive-period-group">
+            <label for="Year" class="form-label">Год:</label>
+            <input type="number" class="form-control" id="Year" name="Year"
+                   min="2000" max="2100" value="@(Model.Filter.Year ?? DateTime.Now.Year)" /> 
+        </div>
+
+        <div id="archive-month-group" class="col-md-3 archive-period-group">
+            <label for="Month" class="form-label">Месяц:</label>
+            <select class="form-select" id="Month" name="Month">
+                <option value="">-- Выберите месяц --</option> 
+                @for (int i = 1; i <= 12; i++)
+                {
+                    <option value="@i" selected="@(Model.Filter.Month == i)">
+                        @CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(i)
+                    </option>
+                }
+            </select>
+        </div>
+
+        <div id="archive-quarter-group" class="col-md-3 archive-period-group">
+            <label for="Quarter" class="form-label">Квартал:</label>
+            <select class="form-select" id="Quarter" name="Quarter">
+                 <option value="">-- Выберите квартал --</option> 
+                <option value="1" selected="@(Model.Filter.Quarter == 1)">I квартал</option>
+                <option value="2" selected="@(Model.Filter.Quarter == 2)">II квартал</option>
+                <option value="3" selected="@(Model.Filter.Quarter == 3)">III квартал</option>
+                <option value="4" selected="@(Model.Filter.Quarter == 4)">IV квартал</option>
+            </select>
+        </div>
+
+        <div id="archive-half-group" class="col-md-3 archive-period-group">
+            <label for="HalfYearPeriod" class="form-label">Полугодие:</label>
+            <select class="form-select" id="HalfYearPeriod" name="HalfYearPeriod">
+                <option value="">-- Выберите полугодие --</option> 
+                <option value="1" selected="@(Model.Filter.HalfYearPeriod == 1)">I полугодие</option>
+                <option value="2" selected="@(Model.Filter.HalfYearPeriod == 2)">II полугодие</option>
+            </select>
+        </div>
+
+
+
+
+
+
+        <div class="col-md-2 align-self-end d-flex gap-2">
+            <button type="submit" class="btn btn-outline-primary w-100">🔍 Фильтровать</button>
+            <button type="button" id="resetFilters" class="btn btn-outline-secondary w-100">↺ Сбросить</button>
+        </div>
+    </form>
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered align-middle">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Тип</th>
+                    <th>Филиал</th>
+                    <th>Период</th>
+                    <th>Комментарий</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var report in Model.Reports)
+                {
+                    <tr>
+                        <td>@report.Name</td>
+                        <td>
+                            @switch ((ReportType)report.Type)
+                            {
+                                case ReportType.Accountant:
+                                    <span class="report-badge accountant">Бухгалтерский</span>
+                                    break;
+                                case ReportType.Plan:
+                                    <span class="report-badge plan">Плановый</span>
+                                    break;
+                                default:
+                                     <span>Неизвестно</span>
+                                     break;
+                            }
+                        </td>
+                        <td>@Model.Branches.FirstOrDefault(b => b.Id == report.BranchId)?.Name</td>
+                        <td>
+
+                            @if (report.TemplateId != null)
+                            {
+                                @PeriodHelper.FormatReportPeriod(report.Period, (DeadlineType)report.DeadlineType) 
+                            }
+                            else
+                            {
+                                @report.Period.ToString("dd.MM.yyyy") 
+                            }
+                        </td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(report.Comment))
+                            {
+                                <button type="button"
+                                        class="btn btn-sm btn-info"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#commentModal-@report.Id">
+                                    Комментарий
+                                </button>
+
+                                <div class="modal fade" id="commentModal-@report.Id"
+                                     tabindex="-1"
+                                     aria-labelledby="modalLabel-@report.Id"
+                                     aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalLabel-@report.Id">Комментарий</h5>
+                                                <button type="button" class="btn-close"
+                                                        data-bs-dismiss="modal"
+                                                        aria-label="Закрыть"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                @report.Comment
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button"
+                                                        class="btn btn-secondary"
+                                                        data-bs-dismiss="modal">Закрыть</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </td>
+                        <td>
+                            <a asp-action="PreviewExcel"
+                               asp-route-reportId="@report.Id"
+                               asp-route-isArchive="@true"
+                               class="btn btn-sm btn-primary">
+                                Просмотр
+                            </a>
+                            <a asp-action="DownloadReport"
+                               asp-route-reportname="@report.Name"
+                               asp-route-reportId="@report.Id"
+                               class="btn btn-sm btn-primary">
+                                ⬇ Скачать
+                            </a>
+                            <form method="post" asp-action="ReopenReport" asp-route-reportId="@report.Id" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Вы уверены, что хотите открыть отчет для редактирования?')">
+                                    🔓 Открыть
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Reports.Any())
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted no-data">Нет отчетов по заданным фильтрам</td> 
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div id="pagination" class="d-flex justify-content-center mt-3"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/archivescr.js"></script>
+}

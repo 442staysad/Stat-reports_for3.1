@@ -1,0 +1,278 @@
+﻿@model SummaryReportGenerationViewModel
+@using System.Globalization
+@using Core.Enums
+@{
+    ViewData["Title"] = "Генерация сводного отчета";
+}
+
+@section Styles {
+<style>
+
+
+    .report-type-tabs .nav-link {
+    font-weight: 500;
+    color: #495057;
+    }
+
+    .report-type-tabs .nav-link.active {
+    font-weight: 600;
+    color: #0d6efd;
+    border-bottom: 2px solid #0d6efd;
+    }
+
+    .branches-container {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+
+    .branch-item {
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+    }
+
+    .branch-item:last-child {
+        border-bottom: none;
+    }
+    .form-check-input {
+        margin-right: 8px;
+    }
+
+</style>
+}
+
+<h2 class="mb-4">@ViewData["Title"]</h2>
+
+<form method="post" id="summaryForm">
+    <ul class="nav nav-tabs report-type-tabs mb-3" id="reportTypeTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="all-tab" data-bs-toggle="tab"
+            data-bs-target="#all" type="button" role="tab"
+            data-report-type="">
+                Все отчеты
+            </button>
+        </li>
+        @foreach (var reportType in Enum.GetValues(typeof(ReportType)))
+        {
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="@(reportType.ToString().ToLower())-tab"
+                data-bs-toggle="tab" data-bs-target="#@(reportType.ToString().ToLower())"
+                type="button" role="tab"
+                data-report-type="@reportType">
+                    @switch (@reportType.ToString())
+                    {
+                        case "Plan":
+                        @Html.Label("Плановый");
+                        break;
+                        case "Accountant":
+                        @Html.Label("Бухгалтерский");
+                        break;
+                    }
+                </button>
+            </li>
+        }
+    </ul>
+
+    <div class="mb-3">
+        <label for="templateSelect" class="form-label">Шаблон отчета:</label>
+        <select id="templateSelect" name="SelectedTemplateId" class="form-select">
+            <option value="">-- Выберите отчет --</option>
+            @foreach (var t in Model.Templates)
+            {
+                <option value="@t.Id"
+                        data-period-type="@t.DeadlineType"
+                        data-report-type="@t.Type">
+                    @t.Name
+                </option>
+            }
+        </select>
+    </div>
+
+    
+        <div id="year-group" class="period-group">
+            <label for="Year" class="form-label">Год:</label>
+            <input asp-for="Year" class="form-control" type="number"
+                   min="2000" max="2100" value="@DateTime.Now.Year" />
+        </div>
+
+        <div id="month-group" class="period-group">
+            <label for="Month" class="form-label">Месяц:</label>
+            <select asp-for="Month" class="form-select">
+                @for (int i = 1; i <= 12; i++)
+                {
+                    <option value="@i">@CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(i)</option>
+                }
+            </select>
+        </div>
+
+        <div id="quarter-group" class="period-group">
+            <label for="Quarter" class="form-label">Квартал:</label>
+            <select asp-for="Quarter" class="form-select">
+                <option value="1">I квартал</option>
+                <option value="2">II квартал</option>
+                <option value="3">III квартал</option>
+                <option value="4">IV квартал</option>
+            </select>
+        </div>
+
+        <div id="half-group" class="period-group">
+            <label for="HalfYearPeriod" class="form-label">Полугодие:</label>
+            <select asp-for="HalfYearPeriod" class="form-select">
+                <option value="1">I полугодие</option>
+                <option value="2">II полугодие</option>
+            </select>
+        </div>
+
+
+    <div class="mb-3">
+        <label class="form-label">Филиалы:</label>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-medium">Выбрать:</span>
+            <div>
+                <button type="button" id="selectAllBranches" class="btn btn-sm btn-success me-2">✓ Все</button>
+                <button type="button" id="deselectAllBranches" class="btn btn-sm btn-warning">× Сбросить</button>
+            </div>
+        </div>
+        <div class="branches-container">
+            @foreach (var branch in Model.Branches)
+            {
+                <div class="branch-item">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="branch_@branch.Id"
+                               name="SelectedBranchIds" value="@branch.Id">
+                        <label class="form-check-label" for="branch_@branch.Id">@branch.Name</label>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Сгенерировать</button>
+</form>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const templateSelect = document.getElementById('templateSelect');
+            const yearGroup = document.getElementById('year-group');
+            const monthGroup = document.getElementById('month-group');
+            const quarterGroup = document.getElementById('quarter-group');
+            const halfGroup = document.getElementById('half-group');
+            const reportTypeTabs = document.querySelectorAll('#reportTypeTabs .nav-link');
+
+            // Функция для фильтрации шаблонов по типу отчета
+            function filterTemplatesByType(reportType) {
+                const options = templateSelect.querySelectorAll('option');
+
+                options.forEach(option => {
+                    if (option.value === "") {
+                        option.style.display = 'block';
+                        return;
+                    }
+
+                    const type = option.getAttribute('data-report-type');
+                    if (!reportType || type === reportType) {
+                        option.style.display = 'block';
+                    } else {
+                        option.style.display = 'none';
+                    }
+                });
+
+                // Сбросить выбор, если текущий выбранный вариант скрыт
+                if (templateSelect.selectedIndex !== 0 &&
+                    templateSelect.options[templateSelect.selectedIndex].style.display === 'none') {
+                    templateSelect.selectedIndex = 0;
+                    updatePeriodFields();
+                }
+            }
+
+            // Функция для обновления полей периода
+            function updatePeriodFields() {
+                const selectedOption = templateSelect.selectedOptions[0];
+                const periodType = selectedOption ? selectedOption.getAttribute('data-period-type') : null;
+
+                // Скрыть все группы
+                yearGroup.style.display = 'none';
+                monthGroup.style.display = 'none';
+                quarterGroup.style.display = 'none';
+                halfGroup.style.display = 'none';
+
+                if (!periodType) return;
+
+                // Показать год для всех типов
+                yearGroup.style.display = 'block';
+
+                // Показать соответствующие поля периода
+                switch(periodType) {
+                    case 'Monthly':
+                        monthGroup.style.display = 'block';
+                        break;
+                    case 'Quarterly':
+                        quarterGroup.style.display = 'block';
+                        break;
+                    case 'HalfYearly':
+                        halfGroup.style.display = 'block';
+                        break;
+                    // Для Yearly показываем только год
+                }
+            }
+
+            // Обработчики событий для вкладок типа отчета
+            reportTypeTabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const reportType = this.getAttribute('data-report-type');
+                    filterTemplatesByType(reportType);
+                });
+            });
+
+            // Обработчик изменения выбора шаблона
+            templateSelect.addEventListener('change', updatePeriodFields);
+
+            // Инициализация
+            filterTemplatesByType('');
+            updatePeriodFields();
+            // Кнопки выбора всех/ничего
+            const selectAllBtn = document.getElementById('selectAllBranches');
+            const deselectAllBtn = document.getElementById('deselectAllBranches');
+            const branchCheckboxes = document.querySelectorAll('input[name="SelectedBranchIds"]');
+
+            selectAllBtn.addEventListener('click', function() {
+                branchCheckboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+            });
+
+            deselectAllBtn.addEventListener('click', function() {
+                branchCheckboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+            });
+
+            // Автоматическая проверка кнопки "Все", если выбраны все филиалы
+            branchCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const allChecked = [...branchCheckboxes].every(cb => cb.checked);
+                    selectAllBtn.classList.toggle('btn-primary', allChecked);
+                    selectAllBtn.classList.toggle('btn-outline-primary', !allChecked);
+                });
+            });
+          document.getElementById('summaryForm').addEventListener('submit', function (e) {
+            const selectedOption = templateSelect.selectedOptions[0];
+            const periodType = selectedOption ? selectedOption.getAttribute('data-period-type') : null;
+
+            if (periodType !== 'Monthly') {
+                document.querySelector('select[name="Month"]').value = '';
+            }
+            if (periodType !== 'Quarterly') {
+                document.querySelector('select[name="Quarter"]').value = '';
+            }
+            if (periodType !== 'HalfYearly') {
+                document.querySelector('select[name="HalfYearPeriod"]').value = '';
+            }
+        });
+        });
+    </script>
+}

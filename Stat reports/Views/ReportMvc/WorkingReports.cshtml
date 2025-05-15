@@ -1,0 +1,645 @@
+﻿@model List<Stat_reports.ViewModels.PendingTemplateViewModel>
+
+@{
+    ViewData["Title"] = "Отчеты в работе";
+
+    // Получаем ID филиала текущего пользователя из сессии
+    int? userBranchId = HttpContextAccessor.HttpContext?.Session?.GetInt32("BranchId");
+    string currentUserRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value; // Получаем роль текущего пользователя
+
+    // Определяем, является ли пользователь глобальным (может видеть все филиалы)
+    bool canViewAllBranches = User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF");
+
+    // Определяем видимые филиалы на основе роли пользователя
+    var visibleBranches = canViewAllBranches
+        ? Model.Select(m => new { m.BranchId, m.BranchName }).Distinct().OrderBy(b => b.BranchName).ToList() // Упорядочим для удобства
+        : Model.Where(m => m.BranchId == userBranchId).Select(m => new { m.BranchId, m.BranchName }).Distinct().ToList();
+
+    // Считаем черновики для текущего пользователя и его типа отчета
+    var draftCounts = Model
+        .Where(m => m.Status == ReportStatus.Draft && m.ReportTypeName == currentUserRole)
+        .GroupBy(m => m.BranchId)
+        .ToDictionary(g => g.Key, g => g.Count());
+
+    // Определяем разрешения на удаление
+    bool canDeleteAny = User.IsInRole("Admin") || User.IsInRole("AdminTrest");
+    bool canDeletePlan = User.IsInRole("PEB");
+    bool canDeleteAccountant = User.IsInRole("OBUnF");
+
+    // Определяем, может ли пользователь управлять шаблонами (открыть модалку)
+    bool canManageTemplates = canDeleteAny || canDeletePlan || canDeleteAccountant;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/pendingReports.css" />
+    <style>
+        .modal-body .list-group-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+            .modal-body .list-group-item span {
+                flex-grow: 1; /* Занять доступное пространство */
+                margin-right: 10px; /* Отступ справа от текста */
+            }
+
+        .action-buttons form {
+            display: inline-block; /* Чтобы формы кнопок были в ряд */
+            margin-left: 5px; /* Небольшой отступ между кнопками */
+        }
+
+            .action-buttons form:first-child {
+                margin-left: 0; /* Убрать отступ для первой кнопки */
+            }
+
+        .pagination {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 5px; /* Промежуток между кнопками пагинации */
+        }
+    </style>
+}
+
+<div class="main-container">
+    <h2 class="page-title">@ViewData["Title"]</h2>
+
+    @* Кнопка добавления отчета (видима для глобальных пользователей) *@
+    @if (canViewAllBranches)
+    {
+        <div class="d-flex justify-content-between mb-4">
+            @* Кнопка "Добавить отчет" - возможно, только для Admin/AdminTrest, если они создают шаблон *@
+            @* Текущая логика isGlobalUser включает PEB/OBUnF. Если "Добавить отчет"
+               действительно создает только шаблон, то она, вероятно, должна быть видна
+               только тем, кто может создавать шаблоны (Admin, AdminTrest, возможно PEB/OBUnF).
+               Уточните, если нужно. Оставляю по вашей логике isGlobalUser. *@
+            <a asp-action="CreateTemplate" asp-controller="ReportMvc" class="btn btn-warning">
+                ➕ Добавить шаблон отчета
+            </a>
+
+            @* Кнопка "Управление шаблонами" - видна, если есть право удалять хоть какие-то шаблоны *@
+            @if (canManageTemplates)
+            {
+                <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#templateManagementModal">
+                    Управление шаблонами
+                </button>
+            }
+        </div>
+    }
+
+    @* Табы по типам отчетов (Плановые/Бухгалтерские) *@
+    <ul class="nav nav-tabs mb-3" id="reportTypeTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-report-type="" type="button">
+                Все отчеты
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-report-type="Plan" type="button">
+                Плановые
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-report-type="Accountant" type="button">
+                Бухгалтерские
+            </button>
+        </li>
+    </ul>
+
+    @* Табы по филиалам *@
+    @if (visibleBranches.Any())
+    {
+        <ul class="nav nav-tabs" id="branchTabs" role="tablist">
+            @for (int i = 0; i < visibleBranches.Count; i++)
+            {
+                var branch = visibleBranches[i];
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link @(i == 0 ? "active" : "")"
+                            id="tab-@branch.BranchId"
+                            data-bs-toggle="tab"
+                            data-bs-target="#branch-@branch.BranchId"
+                            type="button"
+                            role="tab"
+                            aria-controls="branch-@branch.BranchId"
+                            aria-selected="@(i == 0 ? "true" : "false")">
+                        @* Отображаем название филиала и значок черновиков, если пользователь глобальный *@
+                        <span class="d-inline-flex align-items-center gap-1">
+                            @branch.BranchName
+                            @if (canViewAllBranches && draftCounts.TryGetValue(branch.BranchId, out var count) && count > 0)
+                            {
+                                <span class="badge bg-danger rounded-pill">@count</span>
+                            }
+                        </span>
+                    </button>
+                </li>
+            }
+        </ul>
+
+        @* Содержимое табов филиалов *@
+        <div class="tab-content mt-3" id="branchTabsContent">
+            @for (int i = 0; i < visibleBranches.Count; i++)
+            {
+                var branch = visibleBranches[i];
+                var branchReports = Model.Where(m => m.BranchId == branch.BranchId).ToList();
+                var branchActive = i == 0 ? "show active" : "";
+
+                <div class="tab-pane fade @branchActive" id="branch-@branch.BranchId" role="tabpanel">
+                    @if (branchReports.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Отчет</th>
+                                        <th>Срок сдачи</th>
+                                        <th>Статус</th>
+                                        <th>Примечание</th>
+                                        <th class="text-center">Действия</th>
+                                    </tr>
+                                </thead>
+                                @* ID для tbody нужен для пагинации в JS *@
+                                <tbody id="tbody-branch-@branch.BranchId">
+                                    @foreach (var item in branchReports)
+                                    {
+                                        @* Добавляем data-атрибуты для JS фильтрации/удаления *@
+                                        <tr data-report-type="@item.ReportType" data-deadline-id="@item.DeadlineId">
+                                            <td>@item.TemplateName</td>
+                                            <td>@item.Deadline.ToString("dd.MM.yyyy")</td>
+                                            <td>
+                                                <span class="badge @(item.Status != null ? ReportStatusHelper.GetCssClass(item.Status) : "bg-secondary")">
+                                                    @(item.Status != null ? item.Status.GetDisplayName() : "Неизвестно")
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(item.Comment))
+                                                {
+                                                    <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#commentModal-@item.ReportId">
+                                                        Комментарий
+                                                    </button>
+
+                                                    @* Модалка для комментария (ваша текущая, оставлю как есть) *@
+                                                    <div class="modal fade" id="commentModal-@item.ReportId" tabindex="-1"
+                                                         aria-labelledby="commentModalLabel-@item.ReportId" aria-hidden="true">
+                                                        <div class="modal-dialog modal-dialog-centered">
+                                                            <div class="modal-content">
+                                                                <div class="modal-header">
+                                                                    <h5 class="modal-title" id="commentModalLabel-@item.ReportId">Комментарий к отчету</h5>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                                                </div>
+                                                                <div class="modal-body">
+                                                                    <div class="alert alert-info">
+                                                                        <strong>@item.TemplateName</strong><br />
+                                                                        <small class="text-muted">Срок: @item.Deadline.ToString("dd.MM.yyyy")</small>
+                                                                    </div>
+                                                                    <div class="p-3 bg-light rounded text-dark">@* Убедимся, что текст коммента виден на темном фоне модалки *@
+                                                                        @item.Comment
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="action-buttons">
+                                                    @* Кнопки действий с отчетом (загрузить, просмотр, скачать) *@
+                                                    @if (new[] { ReportStatus.Draft, ReportStatus.NeedsCorrection }.Contains(item.Status))
+                                                    {
+                                                        @* Кнопка загрузки видна только если это отчет текущего филиала пользователя или он Admin/AdminTrest *@
+                                                        @if (item.BranchId == userBranchId || User.IsInRole("Admin") || User.IsInRole("AdminTrest"))
+                                                        {
+                                                            <form asp-action="UploadReport" asp-controller="ReportMvc" method="post" enctype="multipart/form-data" class="d-inline-block">
+                                                                <input type="hidden" name="templateId" value="@item.TemplateId" />
+                                                                <input type="hidden" name="deadlineId" value="@item.DeadlineId" /> @* Передаем DeadlineId для обновления статуса *@
+                                                                <div class="file-input-wrapper">
+                                                                    <label class="file-input-label btn btn-sm btn-success">
+                                                                        Перезагрузить
+                                                                    </label>
+                                                                    <input type="file" name="file" class="form-control-file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required onchange="this.form.submit()" />
+
+                                                                </div>
+                                                            </form>
+                                                        }
+                                                        <a asp-action="PreviewExcel" asp-route-reportId="@item.ReportId" asp-route-deadlineId="@item.DeadlineId" class="btn btn-sm btn-primary">
+                                                            Просмотр
+                                                        </a>
+                                                        <a asp-action="DownloadReport" asp-route-reportname="@item.TemplateName" asp-route-reportId="@item.ReportId" class="btn btn-sm btn-primary">
+                                                            Скачать
+                                                        </a>
+                                                    }
+                                                    else if (item.Status == ReportStatus.InProgress)
+                                                    {
+                                                        @* Кнопка загрузки видна только если это отчет текущего филиала пользователя или он Admin/AdminTrest *@
+                                                        @if (item.BranchId == userBranchId || User.IsInRole("Admin") || User.IsInRole("AdminTrest"))
+                                                        {
+                                                            <form asp-action="UploadReport" asp-controller="ReportMvc" method="post" enctype="multipart/form-data" class="d-inline-block">
+                                                                <input type="hidden" name="templateId" value="@item.TemplateId" />
+                                                                <input type="hidden" name="deadlineId" value="@item.DeadlineId" /> @* Передаем DeadlineId для обновления статуса *@
+                                                                <div class="file-input-wrapper">
+                                                                    <label class="file-input-label btn btn-sm btn-primary">
+                                                                        Загрузить
+                                                                    </label>
+                                                                    <input type="file" name="file" class="form-control-file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required onchange="this.form.submit()" />
+
+                                                                </div>
+                                                            </form>
+                                                        }
+                                                    }
+
+                                                    @* --- Кнопка УДАЛЕНИЯ ДЕДЛАЙНА --- *@
+                                                    @{
+                                                        // Определяем, имеет ли текущий пользователь право удалить этот конкретный дедлайн
+                                                        bool canDeleteThisDeadline = canDeleteAny ||
+                                                        (canDeletePlan && item.ReportType == "Plan") ||
+                                                        (canDeleteAccountant && item.ReportType == "Accountant");
+                                                    }
+
+                                                    @if (canDeleteThisDeadline)
+                                                    {
+                                                        @* Используем form для отправки DELETE запроса *@
+                                                        <form asp-action="DeleteDeadline" asp-route-id="@item.DeadlineId" method="post" class="d-inline-block">
+                                                            @* Рекомендуется добавить токен антиподделки для POST запросов *@
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-sm btn-danger"
+                                                                    onclick="return confirm('Вы уверены, что хотите удалить этот срок сдачи отчета?');"
+                                                                    title="Удалить срок сдачи">
+                                                                ❌
+                                                            </button>
+                                                        </form>
+                                                    }
+
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                            @* Элементы пагинации для этого таба филиала *@
+                            <div class="pagination" id="pagination-branch-@branch.BranchId">
+                                @* Кнопки будут добавлены JavaScript'ом *@
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="no-reports">
+                            <i class="bi bi-info-circle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                            <h5>Нет отчетов для отображения</h5>
+                            <p class="text-muted">Для данного филиала нет отчетов в работе</p>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        @* Сообщение, если нет доступных филиалов для текущего пользователя *@
+        <div class="no-reports">
+            <i class="bi bi-info-circle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+            <h5>Нет доступных филиалов или отчетов</h5>
+            <p class="text-muted">Нет данных для отображения для вашего филиала или роли</p>
+        </div>
+    }
+</div>
+
+@* --- Модальное окно для управления шаблонами --- *@
+@if (canManageTemplates)
+{
+    <div class="modal fade" id="templateManagementModal" tabindex="-1" aria-labelledby="templateManagementModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            @* modal-lg для большего размера *@
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="templateManagementModalLabel">Управление шаблонами отчетов</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    @* Здесь будет список шаблонов, загружаемый через AJAX *@
+                    <div id="templateListContainer">
+                        <p class="text-center">Загрузка шаблонов...</p>
+                        @* Опционально можно добавить спиннер Bootstrap *@
+                        <div class="d-flex justify-content-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Загрузка...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="templateManagementError" class="alert alert-danger d-none mt-3" role="alert">
+                        Не удалось загрузить список шаблонов.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+@section Scripts {
+    <script>
+        const userPermissions = {
+            canDeleteAny: @canDeleteAny.ToString().ToLower(),
+            canDeletePlan: @canDeletePlan.ToString().ToLower(),
+            canDeleteAccountant: @canDeleteAccountant.ToString().ToLower()
+        };
+
+        const templateManagementUrl = '@Url.Action("GetTemplatesForManagement", "ReportMvc")'; // URL для получения шаблонов
+        const deleteTemplateUrl = '@Url.Action("DeleteTemplate", "ReportMvc")'; // URL для удаления шаблона (без ID)
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Элементы управления ---
+            const typeTabs = document.querySelectorAll('#reportTypeTabs .nav-link');
+            const branchTabs = document.querySelectorAll('#branchTabs .nav-link');
+            const templateManagementModal = document.getElementById('templateManagementModal');
+            const templateListContainer = document.getElementById('templateListContainer');
+            const templateManagementError = document.getElementById('templateManagementError');
+
+
+            // --- Пагинация ---
+            // Настройки пагинации
+            const rowsPerPage = 10; // количество строк на странице
+
+            // Функция для применения фильтра по типу отчета и пагинации
+            // в пределах *активного* таба филиала
+            function filterAndPaginateActiveTab() {
+                const activeTypeTab = document.querySelector('#reportTypeTabs .nav-link.active');
+                const reportType = activeTypeTab ? activeTypeTab.getAttribute('data-report-type') : ''; // "" для "Все"
+
+                // Находим активный таб филиала и его таблицу
+                const activeBranchPane = document.querySelector('.tab-pane.show.active');
+                if (!activeBranchPane) return; // Нет активного таба филиала
+
+                const tableBody = activeBranchPane.querySelector('tbody');
+                if (!tableBody) return; // Нет тела таблицы в этом табе
+
+                const allRows = Array.from(tableBody.querySelectorAll('tr')); // Все строки в текущем табе
+                let visibleRows = allRows.filter(row => {
+                    const rowType = row.getAttribute('data-report-type');
+                    // Строка видна, если тип не выбран ИЛИ тип строки совпадает с выбранным типом
+                    return !reportType || rowType === reportType;
+                });
+
+                // --- Применяем пагинацию к видимым строкам ---
+                let currentPage = activeBranchPane.dataset.currentPage ? parseInt(activeBranchPane.dataset.currentPage) : 1;
+                const totalVisibleItems = visibleRows.length;
+                const totalPages = Math.ceil(totalVisibleItems / rowsPerPage);
+
+                // Корректируем currentPage, если он стал больше общего количества страниц (например, после фильтрации)
+                if (currentPage > totalPages && totalPages > 0) {
+                    currentPage = totalPages;
+                } else if (totalPages === 0) {
+                    currentPage = 1; // Нет страниц, остаемся на 1 (или показываем "нет данных")
+                }
+                activeBranchPane.dataset.currentPage = currentPage; // Сохраняем текущую страницу для этого таба
+
+
+                const startIndex = (currentPage - 1) * rowsPerPage;
+                const endIndex = startIndex + rowsPerPage;
+
+                // Скрываем все строки сначала
+                allRows.forEach(row => row.style.display = 'none');
+
+                // Показываем только строки из текущей страницы из *отфильтрованного* набора
+                visibleRows.forEach((row, index) => {
+                    if (index >= startIndex && index < endIndex) {
+                        row.style.display = ''; // Показываем строку
+                    }
+                });
+
+                // --- Обновляем контролы пагинации для этого таба ---
+                const paginationContainer = activeBranchPane.querySelector('.pagination');
+                if (!paginationContainer) return;
+
+                paginationContainer.innerHTML = ''; // Очищаем контролы
+
+                if (totalPages <= 1) {
+                    // Если всего одна страница или нет видимых строк, скрываем контролы
+                    paginationContainer.style.display = 'none';
+                    // Опционально: показать сообщение "Нет отчетов" внутри таба, если visibleRows.length === 0
+                    if (totalVisibleItems === 0 && activeBranchPane.querySelector('.no-reports')) {
+                        activeBranchPane.querySelector('.no-reports').style.display = '';
+                    } else if (activeBranchPane.querySelector('.no-reports')) {
+                        activeBranchPane.querySelector('.no-reports').style.display = 'none';
+                    }
+                    return;
+                } else {
+                    paginationContainer.style.display = 'flex'; // Показываем контролы если их больше одной страницы
+                    if (activeBranchPane.querySelector('.no-reports')) {
+                        activeBranchPane.querySelector('.no-reports').style.display = 'none'; // Скрываем "нет отчетов", если они появились
+                    }
+                }
+
+
+                // Кнопка "Предыдущая"
+                const prevButton = document.createElement('button');
+                prevButton.textContent = 'Назад';
+                prevButton.className = 'btn btn-sm btn-outline-secondary prev-page';
+                prevButton.disabled = currentPage === 1;
+                prevButton.addEventListener('click', () => {
+                    if (currentPage > 1) {
+                        activeBranchPane.dataset.currentPage = currentPage - 1; // Сохраняем страницу перед перерисовкой
+                        filterAndPaginateActiveTab(); // Перерисовываем текущий активный таб
+                    }
+                });
+                paginationContainer.appendChild(prevButton);
+
+                // Информация о текущей странице (опционально, но полезно)
+                const pageInfo = document.createElement('span');
+                pageInfo.className = 'page-info btn btn-sm btn-light mx-1'; // Добавляем классы для стиля
+                pageInfo.textContent = `Страница ${currentPage} из ${totalPages}`;
+                paginationContainer.appendChild(pageInfo);
+
+
+                // Кнопка "Следующая"
+                const nextButton = document.createElement('button');
+                nextButton.textContent = 'Вперед';
+                nextButton.className = 'btn btn-sm btn-outline-secondary next-page';
+                nextButton.disabled = currentPage === totalPages;
+                nextButton.addEventListener('click', () => {
+                    if (currentPage < totalPages) {
+                        activeBranchPane.dataset.currentPage = currentPage + 1; // Сохраняем страницу перед перерисовкой
+                        filterAndPaginateActiveTab(); // Перерисовываем текущий активный таб
+                    }
+                });
+                paginationContainer.appendChild(nextButton);
+            }
+
+
+            // --- Обработчики событий ---
+
+            // Обработчики для табов типов отчетов (Все, Плановые, Бухгалтерские)
+            typeTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    typeTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    // При смене типа, сбрасываем пагинацию всех табов филиалов на 1-ю страницу
+                    document.querySelectorAll('.tab-pane').forEach(pane => {
+                        pane.dataset.currentPage = 1;
+                    });
+                    filterAndPaginateActiveTab(); // Применяем фильтр и пагинацию к активному табу
+                });
+            });
+
+            // Обработчики для табов филиалов (событие показа таба)
+            branchTabs.forEach(tab => {
+                // Используем 'shown.bs.tab' событие Bootstrap
+                tab.addEventListener('shown.bs.tab', () => {
+                    // При показе нового таба филиала, применяем текущий фильтр типа отчета и пагинацию к этому табу
+                    filterAndPaginateActiveTab();
+                });
+            });
+
+            // --- Логика Модального Окна Управления Шаблонами ---
+
+            if (templateManagementModal) {
+                templateManagementModal.addEventListener('shown.bs.modal', async () => {
+                    console.log('Модальное окно управления шаблонами открыто. Начинаем загрузку...'); // Добавьте сюда
+                    // Очищаем предыдущее содержимое и показываем индикатор загрузки
+                    templateListContainer.innerHTML = '<p class="text-center">Загрузка шаблонов...</p><div class="d-flex justify-content-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Загрузка...</span></div></div>';
+                    templateManagementError.classList.add('d-none'); // Скрываем предыдущие ошибки
+
+                    try {
+                        console.log('URL для fetch:', templateManagementUrl); // Логируем URL
+                        // Выполняем AJAX GET запрос для получения списка шаблонов
+                        const response = await fetch(templateManagementUrl);
+
+                        console.log('Получен ответ от сервера. Статус:', response.status, 'OK:', response.ok); // Логируем статус ответа
+
+                        if (!response.ok) {
+                            // Логируем полный объект ответа, если статус не OK
+                            console.error("Ответ сервера не OK:", response);
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const templates = await response.json(); // Ожидаем список шаблонов в формате JSON
+                        console.log('Шаблоны успешно загружены:', templates); // Логируем полученные данные
+
+                        // Рендерим список шаблонов в модальном окне
+                        renderTemplatesInModal(templates);
+
+                    } catch (error) {
+                        console.error("Ошибка загрузки шаблонов:", error); // Логируем ошибку
+                        templateListContainer.innerHTML = ''; // Очищаем индикатор загрузки
+                        templateManagementError.textContent = `Не удалось загрузить список шаблонов: ${error.message}`;
+                        templateManagementError.classList.remove('d-none'); // Показываем ошибку
+                    }
+                });
+            }
+
+
+            // Функция для рендеринга списка шаблонов в модальном окне
+            function renderTemplatesInModal(templates) {
+                templateListContainer.innerHTML = ''; // Очищаем контейнер перед добавлением новых элементов
+
+                if (!templates || templates.length === 0) {
+                    templateListContainer.innerHTML = '<p class="text-center">Нет доступных шаблонов.</p>';
+                    return;
+                }
+
+                const listGroup = document.createElement('ul');
+                listGroup.classList.add('list-group'); // Bootstrap класс списка
+
+                templates.forEach(template => {
+                    const listItem = document.createElement('li');
+                    listItem.classList.add('list-group-item'); // Bootstrap класс элемента списка
+                    listItem.dataset.templateId = template.id; // Сохраняем ID шаблона в data-атрибуте
+
+                    // Текст элемента списка: Название (Тип)
+                    const templateText = document.createElement('span');
+                    templateText.textContent = `${template.name} (${template.type === 'Plan' ? 'Плановый' : 'Бухгалтерский'})`;
+                    listItem.appendChild(templateText);
+
+                    // --- Кнопка УДАЛЕНИЯ ШАБЛОНА ---
+                    const deleteButtonContainer = document.createElement('div'); // Контейнер для кнопки
+
+                    // Определяем, имеет ли текущий пользователь право удалить этот конкретный шаблон
+                    // userPermissions определен в секции Scripts Razor View
+                    const canDeleteThisTemplate = userPermissions.canDeleteAny ||
+                        (userPermissions.canDeletePlan && template.type === 'Plan') ||
+                        (userPermissions.canDeleteAccountant && template.type === 'Accountant');
+
+                    if (canDeleteThisTemplate) {
+                        const deleteButtonForm = document.createElement('form');
+                        deleteButtonForm.classList.add('d-inline-block');
+                        // Важно: используем POST метод для удаления
+                        deleteButtonForm.method = 'post';
+                        deleteButtonForm.action = `${deleteTemplateUrl}/${template.id}`; // URL + ID шаблона
+
+                        // Добавляем токен антиподделки (нужно получить его из Razor View и передать в JS)
+                        // Более надежно - получить токен со страницы и добавить в форму
+                        const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]');
+                        if (antiForgeryToken) {
+                            const tokenInput = document.createElement('input');
+                            tokenInput.type = 'hidden';
+                            tokenInput.name = '__RequestVerificationToken';
+                            tokenInput.value = antiForgeryToken.value;
+                            deleteButtonForm.appendChild(tokenInput);
+                        }
+
+
+                        const deleteButton = document.createElement('button');
+                        deleteButton.type = 'submit'; // Кнопка отправляет форму
+                        deleteButton.classList.add('btn', 'btn-sm', 'btn-danger'); // Bootstrap классы
+                        deleteButton.textContent = 'Удалить';
+                        deleteButton.title = 'Удалить шаблон';
+
+                        // Добавляем подтверждение перед отправкой
+                        deleteButton.onclick = function () {
+                            return confirm('Вы уверены, что хотите удалить этот шаблон отчета? Это также может повлиять на связанные сроки сдачи.');
+                        };
+
+                        deleteButtonForm.appendChild(deleteButton);
+                        deleteButtonContainer.appendChild(deleteButtonForm);
+                        listItem.appendChild(deleteButtonContainer);
+                    }
+
+                    listGroup.appendChild(listItem);
+                });
+
+                templateListContainer.appendChild(listGroup);
+            }
+
+
+            // --- Инициализация при загрузке ---
+            // Инициализация: применяем фильтр "Все отчеты" и пагинацию к первому активному табу филиала
+            // Делаем это после того, как Bootstrap активировал первый таб (`shown.bs.tab` не сработает для первого таба при загрузке)
+            const firstBranchPane = document.querySelector('.tab-pane.show.active');
+            if (firstBranchPane) {
+                firstBranchPane.dataset.currentPage = 1; // Устанавливаем начальную страницу
+                filterAndPaginateActiveTab();
+            } else {
+                // Если по какой-то причине нет активных табов (например, visibleBranches пуст)
+                console.log("Нет активных табов филиалов для инициализации пагинации.");
+            }
+
+
+            document.querySelectorAll('.tab-pane .pagination').forEach(container => {
+                container.addEventListener('click', (event) => {
+                    const target = event.target;
+                    if (target.classList.contains('prev-page') && !target.disabled) {
+                        const activeBranchPane = target.closest('.tab-pane');
+                        let currentPage = parseInt(activeBranchPane.dataset.currentPage);
+                        activeBranchPane.dataset.currentPage = currentPage - 1;
+                        filterAndPaginateActiveTab();
+                    } else if (target.classList.contains('next-page') && !target.disabled) {
+                        const activeBranchPane = target.closest('.tab-pane');
+                        let currentPage = parseInt(activeBranchPane.dataset.currentPage);
+                        activeBranchPane.dataset.currentPage = currentPage + 1;
+                        filterAndPaginateActiveTab();
+                    }
+                });
+            });
+
+        });
+    
+    </script>
+    @*<script src="~/js/pending.js"></script>*@
+
+}

@@ -1,0 +1,70 @@
+﻿body {
+    background: linear-gradient(to right, #003366, #0066cc);
+    color: white;
+    min-height: 100vh;
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.archive-container {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 30px;
+    border-radius: 15px;
+    max-width: 1400px;
+    margin: auto;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+}
+
+.table thead {
+    background-color: #002244 !important;
+    color: white;
+}
+
+.table tbody {
+    background-color: rgba(255, 255, 255, 0.9);
+    color: #000;
+}
+
+.form-label {
+    color: #fff;
+}
+
+.btn-outline-primary {
+    border-color: #ffcc00;
+    color: #ffcc00;
+}
+
+    .btn-outline-primary:hover {
+        background-color: #ffcc00;
+        color: #003366;
+    }
+.btn-outline-secondary {
+    color: #ffffff;
+    border-color: #cccccc;
+}
+
+    .btn-outline-secondary:hover {
+        background-color: #cccccc;
+        color: #003366;
+    }
+.badge {
+    font-size: 0.9rem;
+}
+
+.report-badge {
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-weight: 500;
+    border: 2px solid;
+}
+
+    .report-badge.plan {
+        border-color: #007bff; /* синий */
+        color: #007bff;
+    }
+
+    .report-badge.accounting {
+        border-color: #28a745; /* зеленый */
+        color: #28a745;
+    }
+

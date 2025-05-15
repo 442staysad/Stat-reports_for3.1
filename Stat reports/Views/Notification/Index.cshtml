@@ -1,0 +1,173 @@
+﻿@model IEnumerable<Core.Entities.Notification>
+@{
+    ViewData["Title"] = "Уведомления";
+}
+
+<div class="container py-4">
+    <h2 class="mb-4">🔔 Уведомления</h2>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info shadow-sm rounded">
+            У вас нет новых уведомлений.
+        </div>
+    }
+    else
+    {
+        @* Добавляем ID к контейнеру списка *@
+        <div id="notificationListBody" class="list-group shadow-sm">
+            @* Здесь будут элементы list-group-item, которые будем пагинировать *@
+            @foreach (var notification in Model.OrderByDescending(n => n.CreatedAt))
+            {
+                <div class="list-group-item d-flex justify-content-between align-items-start @(!notification.IsRead ? "bg-light border-start border-4 border-warning" : "")">
+                    <div class="ms-2 me-auto">
+                        <div class="fw-bold">@notification.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                        <span>@notification.Message</span>
+                    </div>
+                    @if (!notification.IsRead)
+                    {
+                        <form asp-controller="Notification" asp-action="MarkAsRead" method="post" class="ms-3">
+                            <input type="hidden" name="id" value="@notification.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="Отметить как прочитанное">✔</button>
+                        </form>
+                    }
+                    <form asp-controller="Notification" asp-action="Delete" method="post" class="ms-2">
+                        <input type="hidden" name="id" value="@notification.Id" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить">🗑</button>
+                    </form>
+                </div>
+            }
+        </div>
+
+        @* Добавляем контейнер для контролов пагинации *@
+        @* Добавляем Bootstrap классы для центрирования и отступа *@
+        <div id="notificationPaginationControls" class="d-flex justify-content-center mt-3">
+            @* Кнопки пагинации будут добавлены сюда JavaScript'ом *@
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            // Переносим вашу универсальную функцию пагинации сюда
+            function setupPagination(containerId, controlsId, itemsPerPage) {
+                const container = document.getElementById(containerId);
+                if (!container) {
+                    console.warn(`Container with id "${containerId}" not found.`);
+                    return;
+                }
+                const paginationControls = document.getElementById(controlsId);
+                if (!paginationControls) {
+                    console.warn(`Pagination controls with id "${controlsId}" not found.`);
+                    return;
+                }
+
+                // !!! ИЗМЕНЕНИЕ ЗДЕСЬ !!!
+                // Ищем элементы для пагинации по классу list-group-item, а не по тегу tr
+                const items = Array.from(container.getElementsByClassName('list-group-item'));
+                const totalItems = items.length;
+
+                if (totalItems === 0) {
+                    // Если элементов нет, скрываем контейнер пагинации
+                    paginationControls.style.display = 'none';
+                    // Сообщение "У вас нет новых уведомлений" уже обрабатывается Razor'ом
+                    return;
+                } else {
+                     // Если элементы есть, убедимся, что контейнер пагинации виден
+                     paginationControls.style.display = '';
+                }
+
+
+                const totalPages = Math.ceil(totalItems / itemsPerPage);
+                let currentPage = 1;
+
+                function displayPage(page) {
+                    currentPage = page;
+                    const startIndex = (page - 1) * itemsPerPage;
+                    const endIndex = startIndex + itemsPerPage;
+
+                    items.forEach((item, index) => { // ИСПОЛЬЗУЕМ items
+                        item.style.display = (index >= startIndex && index < endIndex) ? '' : 'none';
+                    });
+
+                    renderControls();
+                }
+
+                function renderControls() {
+                    paginationControls.innerHTML = ''; // Очистить предыдущие контролы
+
+                    if (totalPages <= 1) return; // Не нужны контролы если всего одна страница или меньше
+
+                    // Добавляем Bootstrap классы для стилизации кнопок
+
+                    // Кнопка "Назад"
+                    const prevButton = document.createElement('button');
+                    prevButton.textContent = 'Назад';
+                    prevButton.className = 'btn btn-sm btn-outline-secondary mx-1'; // Bootstrap классы
+                    prevButton.disabled = currentPage === 1;
+                    prevButton.addEventListener('click', () => {
+                        if (currentPage > 1) {
+                            displayPage(currentPage - 1);
+                        }
+                    });
+                    paginationControls.appendChild(prevButton);
+
+                    // Кнопки страниц
+                    for (let i = 1; i <= totalPages; i++) {
+                        const pageButton = document.createElement('button');
+                        pageButton.textContent = i;
+                        // Активная кнопка синяя, неактивные - серые, добавляем отступы
+                        pageButton.className = 'btn btn-sm mx-1 ' + (i === currentPage ? 'btn-primary' : 'btn-outline-secondary');
+                         // Отключаем клик на активной странице, если хотите, или оставьте включенным
+                         // pageButton.disabled = (i === currentPage);
+                        pageButton.addEventListener('click', () => {
+                            displayPage(i);
+                        });
+                        paginationControls.appendChild(pageButton);
+                    }
+
+                    // Кнопка "Вперед"
+                    const nextButton = document.createElement('button');
+                    nextButton.textContent = 'Вперед';
+                    nextButton.className = 'btn btn-sm btn-outline-secondary mx-1'; // Bootstrap классы
+                    nextButton.disabled = currentPage === totalPages;
+                    nextButton.addEventListener('click', () => {
+                        if (currentPage < totalPages) {
+                            displayPage(currentPage + 1);
+                        }
+                    });
+                    paginationControls.appendChild(nextButton);
+                }
+
+                displayPage(1); // Показать первую страницу при инициализации
+            }
+
+            // !!! ДОБАВЛЯЕМ ВЫЗОВ ФУНКЦИИ ДЛЯ УВЕДОМЛЕНИЙ !!!
+            // Проверяем, существует ли контейнер списка уведомлений (он есть только если Model.Any())
+            if (document.getElementById('notificationListBody')) {
+                 // Настраиваем пагинацию: контейнер 'notificationListBody', контролы 'notificationPaginationControls'
+                 // 10 элементов на странице (можете изменить)
+                 setupPagination('notificationListBody', 'notificationPaginationControls', 10);
+            }
+
+
+            // Оставляем (или удаляем, если не нужны на этой странице) другие вызовы setupPagination
+            // Настройка пагинации для таблицы филиалов
+            // Вы можете изменить '5' на желаемое количество элементов на странице
+            if (document.getElementById('branchTableBody')) {
+                 setupPagination('branchTableBody', 'branchPaginationControls', 5);
+            }
+
+            // Настройка пагинации для таблицы пользователей
+            // Вы можете изменить '5' на желаемое количество элементов на странице
+            if (document.getElementById('userTableBody')) {
+                 setupPagination('userTableBody', 'userPaginationControls', 5);
+            }
+
+            // Добавьте сюда другие инициализации или скрипты, если есть
+
+        });
+    </script>
+}

@@ -1,0 +1,13 @@
+﻿@using Microsoft.AspNetCore.Http
+@using Stat_reports
+@using Stat_reports.Models
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using System.Globalization
+@using Stat_reports.ViewModels
+@inject Core.Interfaces.INotificationService _notificationService
+@inject IHttpContextAccessor HttpContextAccessor
+@using Core.DTO
+@using Core.Enums
+@using Stat_reports.Utils
+@using System.Security.Claims // Для User.Claims

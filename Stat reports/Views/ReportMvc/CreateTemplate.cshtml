@@ -1,0 +1,110 @@
+﻿@using Core.Enums
+@model Stat_reports.ViewModels.CreateTemplateViewModel
+
+@{
+    ViewData["Title"] = "Добавить шаблон";
+    var allowedTypes = ViewBag.AllowedTypes as List<ReportType>;
+}
+
+@section Styles {
+<style>
+    body {
+    background: linear-gradient(to right, #003366, #0066cc);
+    color: white;
+    padding-top: 40px;
+    }
+
+    .main-container {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 30px;
+    border-radius: 15px;
+    max-width: 800px;
+    margin: auto;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+    }
+
+    label {
+    color: #fff;
+    }
+</style>
+}
+
+<div class="main-container">
+    <h2 class="text-center mb-4">Добавить шаблон отчета</h2>
+
+    <form asp-action="CreateTemplate" method="post" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label asp-for="Name" class="form-label">Название</label>
+            <input asp-for="Name" class="form-control" required />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="File" class="form-label">Загрузить файл шаблона</label>
+            <input asp-for="File" type="file" name="File" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label asp-for="Description" class="form-label">Описание</label>
+            <input asp-for="Description" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Type" class="form-label">Тип отчета</label>
+            <select asp-for="Type" class="form-select">
+                @foreach (var type in allowedTypes)
+                {
+                    switch (type.ToString())
+                    {
+                        case "Plan":
+                            <option value="@type">Плановый</option>
+                            break;
+                        case "Accountant":
+                            <option value="@type">Бухгалтерский</option>
+                            break;
+                    }
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="DeadlineType" class="form-label">Тип периодичности</label>
+            <select asp-for="DeadlineType" class="form-select">
+                @foreach (var type in Enum.GetValues(typeof(DeadlineType)))
+                {
+                    switch (type.ToString())
+                    {
+                        case "Monthly":
+                            <option value="@type">Месячный</option>
+                            break;
+						case "Quarterly":
+							<option value="@type">Квартальный</option>
+							break;
+                        case "HalfYearly":
+                            <option value="@type">Полугодовой</option>
+                            break;
+						case "Yearly":
+							<option value="@type">Годовой</option>
+							break;
+						default:
+							<option value="@type">@type</option>
+							break;
+                    }
+                    
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="FixedDay" class="form-label">Фиксированное число (число месяца для сдачи отчет, например 27)</label>
+            <input asp-for="FixedDay" class="form-control" type="number" required />
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="ReportDate" class="form-label">Дата отчета(предыдущий) для вычисления срока сдачи</label>
+            <input asp-for="ReportDate" class="form-control" type="date" required />
+        </div>
+
+        <div class="text-center">
+            <button type="submit" class="btn btn-warning">Добавить</button>
+        </div>
+    </form>
+</div>

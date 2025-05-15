@@ -1,0 +1,139 @@
+﻿@model Stat_reports.ViewModels.UserProfileViewModel
+
+@{
+    ViewData["Title"] = "Профиль пользователя";
+
+    // Определяем, разрешено ли пользователю редактировать данные филиала
+    bool isBranchEditable = User.IsInRole("AdminBranch") || User.IsInRole("Admin") || User.IsInRole("AdminTrest");
+}
+
+@section Styles {
+    <style>
+        body {
+            background: linear-gradient(to right, #003366, #0066cc);
+            color: white;
+            min-height: 100vh;
+            padding-top: 40px;
+        }
+
+        .main-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 1000px;
+            margin: auto;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        .form-control {
+            margin-bottom: 15px;
+        }
+
+        .section-title {
+            border-bottom: 2px solid #fff;
+            margin-top: 20px;
+            padding-bottom: 5px;
+            font-size: 1.2rem;
+        }
+
+        .btn-save {
+            background-color: #ffcc00;
+            color: #003366;
+            border: none;
+            font-weight: bold;
+        }
+
+        /* Стиль для отключенных полей, чтобы они выглядели как неактивные */
+        .form-control:disabled {
+            background-color: rgba(255, 255, 255, 0.1); /* Слегка прозрачный фон */
+            color: rgba(255, 255, 255, 0.6); /* Слегка прозрачный текст */
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+}
+
+<div class="main-container">
+    <h2 class="text-center mb-4">@ViewData["Title"]</h2>
+
+
+    <form method="post">
+        <div class="section-title">👤 Данные пользователя</div>
+
+        <input type="hidden" asp-for="UserId" />
+        <div class="row">
+            <div class="col-md-6">
+                <label>ФИО</label>
+                <input asp-for="FullName" class="form-control" />
+                <label>Телефон</label>
+                <input asp-for="Number" class="form-control" />
+            </div>
+            <div class="col-md-6">
+                <label>Email</label>
+                <input asp-for="Email" class="form-control" />
+                <label>Должность</label>
+                <input asp-for="Position" class="form-control" />
+            </div>
+        </div>
+
+        <div class="section-title">🏢 Данные филиала</div>
+
+        <input type="hidden" asp-for="BranchId" />
+        <div class="row">
+            <div class="col-md-6">
+                <label>Название</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="Name" class="form-control" disabled="@(!isBranchEditable)" />
+                <label>Краткое название</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="Shortname" class="form-control" disabled="@(!isBranchEditable)" />
+                <label>Регион</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="Region" class="form-control" disabled="@(!isBranchEditable)" />
+                <label>Адрес</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="Address" class="form-control" disabled="@(!isBranchEditable)" />
+            </div>
+            <div class="col-md-6">
+                <label>УНП</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="UNP" class="form-control" disabled="@(!isBranchEditable)" />
+                <label>ОКПО</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="OKPO" class="form-control" disabled="@(!isBranchEditable)" />
+                <label>ОКЮЛП</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="OKYLP" class="form-control" disabled="@(!isBranchEditable)" />
+                <label>Email филиала</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="BranchEmail" class="form-control" disabled="@(!isBranchEditable)" />
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <label>Подчинение</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="GoverningName" class="form-control" disabled="@(!isBranchEditable)" />
+                <label>Руководитель</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="HeadName" class="form-control" disabled="@(!isBranchEditable)" />
+            </div>
+            <div class="col-md-6">
+                <label>Куратор</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="Supervisor" class="form-control" disabled="@(!isBranchEditable)" />
+                <label>Главный бухгалтер</label>
+                @* Corrected syntax for Tag Helper boolean attribute *@
+                <input asp-for="ChiefAccountant" class="form-control" disabled="@(!isBranchEditable)" />
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <button type="submit" class="btn btn-save px-4 py-2">💾 Сохранить</button>
+        </div>
+    </form>
+</div>

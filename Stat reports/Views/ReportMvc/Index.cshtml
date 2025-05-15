@@ -1,0 +1,30 @@
+﻿@model IEnumerable<Core.Entities.Report>
+
+<h2>Список отчетов</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Название</th>
+            <th>Статус</th>
+            <th>Дата загрузки</th>
+            <th>Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var report in Model)
+        {
+            <tr>
+                <td>@report.Id</td>
+                <td>@report.Name</td>
+                <td>@report.UploadDate</td>
+                <td>
+                    <a href="@Url.Action("Edit", "ReportMvc", new { id = @report.Id })">Редактировать</a> |
+                    <a href="@Url.Action("Download", "ReportApi", new { id = @report.Id, reportname=@report.Name})">Скачать</a> |
+                    <a href="@Url.Action("Delete", "ReportMvc", new { id = @report.Id })">Удалить</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+<a href="@Url.Action("Upload", "ReportMvc")">Загрузить новый отчет</a>

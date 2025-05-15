@@ -1,0 +1,112 @@
+﻿@model IEnumerable<UserDto>
+
+@{
+    ViewData["Title"] = "Пользователи";
+}
+
+@section Styles {
+    <style>
+        .user-table {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-radius: 10px;
+        }
+
+            .user-table th, .user-table td {
+                padding: 10px;
+                border-bottom: 1px solid rgba(255,255,255,0.2);
+            }
+
+        .btn-add {
+            background-color: #ffcc00;
+            color: #003366;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        /* Стили для пагинации (можно вынести в общий CSS файл, если используется на нескольких страницах) */
+        .pagination-controls {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+            .pagination-controls button {
+                background-color: #003366;
+                color: white;
+                border: 1px solid #ffcc00;
+                padding: 5px 10px;
+                margin: 0 3px;
+                cursor: pointer;
+                border-radius: 4px;
+            }
+
+                .pagination-controls button:disabled {
+                    background-color: #5a6268;
+                    cursor: not-allowed;
+                    border-color: #5a6268;
+                }
+
+                .pagination-controls button.active {
+                    background-color: #ffcc00;
+                    color: #003366;
+                    font-weight: bold;
+                }
+    </style>
+}
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["Success"]
+    </div>
+}
+<div class="main-container">
+    <h2>Пользователи</h2>
+    @if (User.IsInRole("Admin") || User.IsInRole("AdminTrest") || User.IsInRole("AdminBranch"))
+    {
+        <a asp-action="Create" class="btn btn-add">➕ Добавить пользователя</a>
+    }
+    <table class="table user-table" id="userTable">
+        <thead>
+            <tr>
+                <th>Имя</th>
+                <th>ФИО</th>
+                <th>Роль</th>
+                <th>Телефон</th>
+                <th>Онлайн</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="userTableBody">
+            @foreach (var user in Model)
+            {
+                @if (user.RoleName != "Admin")
+                {
+                    <tr>
+                        <td>@user.UserName</td>
+                        <td>@user.FullName</td>
+                        <td>@user.RoleNameRu</td>
+                        <td>@user.Number</td>
+                        <td><span class="badge bg-secondary">⏳ offline</span></td>
+                        <td>
+                            @if (User.IsInRole("Admin") || User.IsInRole("AdminTrest") || User.IsInRole("AdminBranch"))
+                            {
+                                <form asp-action="Delete" asp-route-id="@user.Id" method="post" onsubmit="return confirm('Удалить пользователя?');">
+                                    <button type="submit" class="btn btn-sm btn-danger">🗑 Удалить</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+    <div id="userPaginationControls" class="pagination-controls"></div>
+</div>
+
+@section Scripts {
+    <script src="~/js/userbranchpagination.js">
+       
+    </script>
+}

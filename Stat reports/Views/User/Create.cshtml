@@ -1,0 +1,64 @@
+﻿@model Stat_reports.ViewModels.UserCreateViewModel
+@{
+    ViewData["Title"] = "Добавить пользователя";
+}
+@section Styles {
+    <style>
+        body {
+            background: linear-gradient(to right, #003366, #0066cc);
+            color: white;
+            min-height: 100vh;
+            padding-top: 40px;
+        }
+
+        .main-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 1000px;
+            margin: auto;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        .form-control {
+            margin-bottom: 15px;
+        }
+
+        .section-title {
+            border-bottom: 2px solid #fff;
+            margin-top: 20px;
+            padding-bottom: 5px;
+            font-size: 1.2rem;
+        }
+
+        .btn-save {
+            background-color: #ffcc00;
+            color: #003366;
+            border: none;
+            font-weight: bold;
+        }
+    </style>
+}
+<div class="main-container">
+    <h2>@ViewData["Title"]</h2>
+    <form asp-action="Create" method="post">
+        <label>Логин</label>
+        <input asp-for="UserName" class="form-control" />
+        <label>ФИО</label>
+        <input asp-for="FullName" class="form-control" />
+        <label>Пароль</label>
+        <input asp-for="Password" type="password" class="form-control" />
+        @if (User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF"))
+        {
+            <label>Роль</label>
+            <select asp-for="RoleId" class="form-select" asp-items="Model.RoleOptions"></select>
+            <label>Филиал</label>
+            <select asp-for="BranchId" class="form-select" asp-items="Model.BranchOptions"></select>
+        }
+        <button type="submit" class="btn-save btn">Сохранить</button>
+    </form>
+</div>

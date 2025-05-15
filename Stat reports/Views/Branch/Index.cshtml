@@ -1,0 +1,105 @@
+﻿@model IEnumerable<BranchDto>
+
+@{
+    ViewData["Title"] = "Филиалы";
+}
+
+@section Styles {
+    <style>
+        .branch-table {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-radius: 10px;
+        }
+
+            .branch-table th, .branch-table td {
+                padding: 10px;
+                border-bottom: 1px solid rgba(255,255,255,0.2);
+            }
+
+        .btn-add {
+            background-color: #ffcc00;
+            color: #003366;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        /* Стили для пагинации */
+        .pagination-controls {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+            .pagination-controls button {
+                background-color: #003366;
+                color: white;
+                border: 1px solid #ffcc00;
+                padding: 5px 10px;
+                margin: 0 3px;
+                cursor: pointer;
+                border-radius: 4px;
+            }
+
+                .pagination-controls button:disabled {
+                    background-color: #5a6268;
+                    cursor: not-allowed;
+                    border-color: #5a6268;
+                }
+
+                .pagination-controls button.active {
+                    background-color: #ffcc00;
+                    color: #003366;
+                    font-weight: bold;
+                }
+    </style>
+}
+
+<div class="main-container">
+    <h2>Филиалы</h2>
+    @if (User.IsInRole("Admin") || User.IsInRole("AdminTrest"))
+    {
+        <a asp-action="Create" class="btn btn-add">➕ Добавить филиал</a>
+    }
+    <table class="table branch-table" id="branchTable">
+        <thead>
+            <tr>
+                <th>Название</th>
+                <th>УНП</th>
+                <th>Регион</th>
+                <th>Адрес</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="branchTableBody">
+            @foreach (var branch in Model)
+            {
+                @if (branch.Name != "Admin")
+                {
+                    <tr>
+                        <td>@branch.Name</td>
+                        <td>@branch.UNP</td>
+                        <td>@branch.Region</td>
+                        <td>@branch.Address</td>
+                        <td>
+                            @if (User.IsInRole("Admin") || User.IsInRole("AdminTrest") || User.IsInRole("AdminBranch"))
+                            {
+                                <form asp-action="Delete" asp-route-id="@branch.Id" method="post" onsubmit="return confirm('Удалить филиал?');">
+                                    <button type="submit" class="btn btn-sm btn-danger">🗑 Удалить</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+    <div id="branchPaginationControls" class="pagination-controls"></div>
+</div>
+
+@section Scripts {
+    <script src="~/js/userbranchpagination.js">
+       
+    </script>
+}
