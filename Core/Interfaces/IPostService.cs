@@ -11,6 +11,6 @@ namespace Core.Interfaces
     public interface IPostService
     {
         Task<List<Post>> GetRecentPostsForUserAsync();
-        Task AddPostAsync(string header, string text, int posterId);
+        Task<Post> AddPostAsync(string header, string text, int posterId);
     }
 }

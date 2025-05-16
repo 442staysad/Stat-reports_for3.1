@@ -83,9 +83,9 @@
                         <td>@branch.Region</td>
                         <td>@branch.Address</td>
                         <td>
-                            @if (User.IsInRole("Admin") || User.IsInRole("AdminTrest") || User.IsInRole("AdminBranch"))
+                            @if (User.IsInRole("Admin") || User.IsInRole("AdminTrest"))
                             {
-                                <form asp-action="Delete" asp-route-id="@branch.Id" method="post" onsubmit="return confirm('Удалить филиал?');">
+                                <form asp-action="Delete" asp-route-id="@branch.Id" asp-for="id" method="post" onsubmit="return confirm('Удалить филиал?');">
                                     <button type="submit" class="btn btn-sm btn-danger">🗑 Удалить</button>
                                 </form>
                             }

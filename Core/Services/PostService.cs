@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Core.Entities;
 using Core.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace Core.Services
 {
@@ -21,7 +22,7 @@ namespace Core.Services
         public async Task<List<Post>> GetRecentPostsForUserAsync()
         {
 
-            var posts = await _unitOfWork.Posts.GetAllAsync();
+            var posts = await _unitOfWork.Posts.GetAll(p=>p.Include(r=>r.Poster)).ToListAsync();
             return posts
                 .Where(p => p.Poster != null)
                 .GroupBy(p => p.Poster.Role)
@@ -30,7 +31,7 @@ namespace Core.Services
                 .ToList();
         }
 
-        public async Task AddPostAsync(string header, string text, int posterId)
+        public async Task<Post> AddPostAsync(string header, string text, int posterId)
         {
             var post = new Post
             {
@@ -39,8 +40,9 @@ namespace Core.Services
                 PosterId = posterId,
                 PostDate = DateTime.Now
             };
-
             await _unitOfWork.Posts.AddAsync(post);
+            await _unitOfWork.SaveChangesAsync();
+            return post;
         }
     }
 }

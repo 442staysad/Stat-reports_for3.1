@@ -53,6 +53,13 @@
             color: rgba(255, 255, 255, 0.6); /* Слегка прозрачный текст */
             border-color: rgba(255, 255, 255, 0.2);
         }
+        /* Добавьте стили для readonly */
+        .form-control[readonly] {
+            background-color: rgba(255, 255, 255, 0.1); /* Используйте те же или похожие стили */
+            color: rgba(255, 255, 255, 0.6);
+            border-color: rgba(255, 255, 255, 0.2);
+            cursor: default; /* Меняем курсор, чтобы показать, что поле не редактируется */
+        }
     </style>
 }
 
@@ -60,7 +67,7 @@
     <h2 class="text-center mb-4">@ViewData["Title"]</h2>
 
 
-    <form method="post">
+    <form asp-action="Profile" method="post">
         <div class="section-title">👤 Данные пользователя</div>
 
         <input type="hidden" asp-for="UserId" />
@@ -86,30 +93,30 @@
             <div class="col-md-6">
                 <label>Название</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="Name" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="Name" class="form-control" readonly="@(!isBranchEditable)" />
                 <label>Краткое название</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="Shortname" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="Shortname" class="form-control" readonly="@(!isBranchEditable)" />
                 <label>Регион</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="Region" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="Region" class="form-control" readonly="@(!isBranchEditable)" />
                 <label>Адрес</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="Address" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="Address" class="form-control" readonly="@(!isBranchEditable)" />
             </div>
             <div class="col-md-6">
                 <label>УНП</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="UNP" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="UNP" class="form-control" readonly="@(!isBranchEditable)" />
                 <label>ОКПО</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="OKPO" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="OKPO" class="form-control" readonly="@(!isBranchEditable)" />
                 <label>ОКЮЛП</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="OKYLP" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="OKYLP" class="form-control" readonly="@(!isBranchEditable)" />
                 <label>Email филиала</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="BranchEmail" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="BranchEmail" class="form-control" readonly="@(!isBranchEditable)" />
             </div>
         </div>
 
@@ -117,18 +124,18 @@
             <div class="col-md-6">
                 <label>Подчинение</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="GoverningName" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="GoverningName" class="form-control" readonly="@(!isBranchEditable)" />
                 <label>Руководитель</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="HeadName" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="HeadName" class="form-control" readonly="@(!isBranchEditable)" />
             </div>
             <div class="col-md-6">
                 <label>Куратор</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="Supervisor" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="Supervisor" class="form-control" readonly="@(!isBranchEditable)" />
                 <label>Главный бухгалтер</label>
                 @* Corrected syntax for Tag Helper boolean attribute *@
-                <input asp-for="ChiefAccountant" class="form-control" disabled="@(!isBranchEditable)" />
+                <input asp-for="ChiefAccountant" class="form-control" readonly="@(!isBranchEditable)" />
             </div>
         </div>
 

@@ -60,8 +60,6 @@ namespace Stat_reports.Controllers
         [HttpPost]
         public async Task<IActionResult> Profile(UserProfileViewModel model)
         {
-            if (!ModelState.IsValid)
-                return View(model);
 
             var userDto = new UserProfileDto
             {
@@ -93,7 +91,7 @@ namespace Stat_reports.Controllers
             await _branchService.UpdateBranchAsync(branchDto);
 
             TempData["Success"] = "Профиль успешно обновлен!";
-            return RedirectToAction("Profile");
+            return RedirectToAction("Index");
         }
     }
 }

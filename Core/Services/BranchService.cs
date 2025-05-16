@@ -49,6 +49,7 @@ namespace Core.Services
             var branch = await _unitOfWork.Branches.FindAsync(b => b.Id == id);
             if (branch == null) return false;
             await _unitOfWork.Branches.DeleteAsync(branch);
+            await _unitOfWork.SaveChangesAsync(); 
             return true;
         }
 
@@ -56,6 +57,7 @@ namespace Core.Services
         {
             return (await _unitOfWork.Branches.GetAllAsync()).Select(b => new BranchDto
             {
+                Id=b.Id,
                 Name = b.Name,
                 Shortname = b.Shortname,
                 UNP = b.UNP!,
@@ -98,8 +100,10 @@ namespace Core.Services
             branch.Email = dto.Email;
             branch.Supervisor = dto.Supervisor;
             branch.ChiefAccountant = dto.ChiefAccountant;
+            await _unitOfWork.Branches.UpdateAsync(branch);
+            await _unitOfWork.SaveChangesAsync(); // <-- Обязательно сохранить
 
-            return await _unitOfWork.Branches.UpdateAsync(branch);
+            return branch;
         }
     }
 }

@@ -9,7 +9,7 @@ using Stat_reports.ViewModels;
 
 namespace Stat_reports.Controllers
 {
-    [Authorize(Roles = "Admin,PEB,OBUnF")]
+    [Authorize(Roles = "Admin,PEB,OBUnF,AdminTrest")]
     public class BranchController : Controller
     {
         private readonly IBranchService _branchService;

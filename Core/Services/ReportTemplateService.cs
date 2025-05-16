@@ -51,6 +51,9 @@ namespace Core.Services
 
             foreach (var branch in branches)
             {
+                // Пропускаем филиал с именем "Admin"
+                if (branch.Name == "Admin")
+                    continue;
                 // Вычисление дедлайна, используя дату отчета
                 var deadlineDate = _deadlineService.CalculateDeadline(deadlineType, FixedDay, ReportDate);
 

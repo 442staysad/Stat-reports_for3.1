@@ -43,11 +43,11 @@ else
     {
         <div class="card mb-3">
             <div class="card-header">
-                <strong>@(post.PostHeader ?? "(Без заголовка)")</strong>
-                <span class="text-muted float-end">@post.PostDate.ToString("dd.MM.yyyy HH:mm")</span>
+                <strong style="color:black">@(post.PostHeader ?? "(Без заголовка)")</strong>
+                <span class="text-muted float-end" style="color:black">@post.PostDate.ToString("dd.MM.yyyy HH:mm")</span>
             </div>
             <div class="card-body">
-                <p>@post.PostText</p>
+                <p style ="color:black">@post.PostText</p>
             </div>
         </div>
     }

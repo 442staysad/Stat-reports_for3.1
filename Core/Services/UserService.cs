@@ -31,6 +31,7 @@ namespace Core.Services
                         .Where(u => !branchId.HasValue || u.BranchId == branchId);
             return query.Select(u => new UserDto
             {
+                Id = u.Id,
                 UserName = u.UserName,
                 FullName = u.FullName,
                 Number = u.Number,
@@ -83,9 +84,11 @@ namespace Core.Services
             user.Email = dto.Email;
             user.Position = dto.Position;
 
-            return await _unitOfWork.Users.UpdateAsync(user);
-        }
+            await _unitOfWork.Users.UpdateAsync(user);
+            await _unitOfWork.SaveChangesAsync(); // <-- Обязательно сохранить
 
+            return user;
+        }
         public async Task<bool> DeleteUserAsync(int id)
         {
             var user = await _unitOfWork.Users.FindAsync(u => u.Id == id);
