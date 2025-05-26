@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Stat_reportsnt.Filters;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using System;
 
 namespace Stat_reports.Controllers
 {
@@ -53,6 +54,10 @@ namespace Stat_reports.Controllers
                 Supervisor = branch.Supervisor,
                 ChiefAccountant = branch.ChiefAccountant
             };
+            // Инициализация моделей для модалок и передача их через ViewBag
+            ViewBag.UserChangePasswordModel = new UserChangePasswordViewModel { UserId = model.UserId };
+            ViewBag.BranchChangePasswordModel = new BranchChangePasswordViewModel { BranchId = model.BranchId };
+
 
             return View("Profile", model);
         }
@@ -93,5 +98,86 @@ namespace Stat_reports.Controllers
             TempData["Success"] = "Профиль успешно обновлен!";
             return RedirectToAction("Index");
         }
+
+        [HttpPost]
+        public async Task<IActionResult> ChangeUserPassword(UserChangePasswordViewModel model)
+        {
+            Console.WriteLine($"!!!!!!!!!!!!!!!! {model.ConfirmNewPassword} {model.NewPassword} {model.CurrentPassword}");
+            // Валидация модели
+            if (!ModelState.IsValid)
+            {
+                TempData["Error"] = "Пожалуйста, исправьте ошибки в форме.";
+                // Если невалидно, нужно заново получить данные профиля, чтобы отобразить страницу
+                // Это может быть сложно, если ViewModel большая. Проще вернуть View("Profile", currentProfileViewModel)
+                // Но для простоты сейчас просто перенаправим на Index и покажем ошибки через TempData
+                return RedirectToAction("Index");
+            }
+
+            int? userId = HttpContext.Session.GetInt32("UserId");
+            if (userId == null || userId.Value != model.UserId)
+            {
+                TempData["Error"] = "Ошибка авторизации или неверный ID пользователя.";
+                return RedirectToAction("UserLogin", "Auth"); // или AccessDenied
+            }
+
+            var userChangePasswordDto = new UserChangePasswordDto
+            {
+                UserId = model.UserId,
+                CurrentPassword = model.CurrentPassword,
+                NewPassword = model.NewPassword
+            };
+
+            bool success = await _userService.ChangeUserPasswordAsync(userChangePasswordDto);
+
+            if (success)
+            {
+                TempData["Success"] = "Пароль пользователя успешно изменен!";
+            }
+            else
+            {
+                TempData["Error"] = "Ошибка при смене пароля пользователя. Возможно, текущий пароль неверен.";
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ChangeBranchPassword(BranchChangePasswordViewModel model)
+        {
+            // Проверка прав пользователя
+            if (!User.IsInRole("AdminBranch") && !User.IsInRole("Admin") && !User.IsInRole("AdminTrest"))
+            {
+                TempData["Error"] = "У вас нет прав для изменения пароля филиала.";
+                return RedirectToAction("AccessDenied", "Auth");
+            }
+
+            // Валидация модели
+            if (!ModelState.IsValid)
+            {
+                TempData["Error"] = "Пожалуйста, исправьте ошибки в форме.";
+                return RedirectToAction("Index");
+            }
+
+            var branchChangePasswordDto = new BranchChangePasswordDto
+            {
+                BranchId = model.BranchId,
+                CurrentPassword = model.CurrentPassword,
+                NewPassword = model.NewPassword
+            };
+
+            bool success = await _branchService.ChangeBranchPasswordAsync(branchChangePasswordDto);
+
+            if (success)
+            {
+                TempData["Success"] = "Пароль филиала успешно изменен!";
+            }
+            else
+            {
+                TempData["Error"] = "Ошибка при смене пароля филиала. Возможно, текущий пароль неверен или филиал не найден.";
+            }
+
+            return RedirectToAction("Index");
+        }
+
     }
 }

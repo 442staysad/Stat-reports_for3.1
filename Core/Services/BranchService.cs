@@ -105,5 +105,28 @@ namespace Core.Services
 
             return branch;
         }
+
+        public async Task<bool> ChangeBranchPasswordAsync(BranchChangePasswordDto dto)
+        {
+            var branch = await _unitOfWork.Branches.FindAsync(b => b.Id == dto.BranchId);
+            if (branch == null)
+            {
+                return false; // Филиал не найден
+            }
+
+            // Проверяем текущий пароль
+            var result = _branchpasswordHasher.VerifyHashedPassword(branch, branch.PasswordHash, dto.CurrentPassword);
+            if (result == PasswordVerificationResult.Failed)
+            {
+                return false; // Неверный текущий пароль
+            }
+
+            // Хешируем новый пароль
+            branch.PasswordHash = _branchpasswordHasher.HashPassword(branch, dto.NewPassword);
+
+            await _unitOfWork.Branches.UpdateAsync(branch);
+            return true;
+        }
+
     }
 }

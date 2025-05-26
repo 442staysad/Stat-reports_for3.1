@@ -16,5 +16,6 @@ namespace Core.Interfaces
         Task<Branch> CreateBranchAsync(BranchDto dto);
         Task<Branch> UpdateBranchAsync(BranchProfileDto dto);
         Task<bool> DeleteBranchAsync(int id);
+        Task<bool> ChangeBranchPasswordAsync(BranchChangePasswordDto dto);
     }
 }

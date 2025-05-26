@@ -96,5 +96,28 @@ namespace Core.Services
             await _unitOfWork.Users.DeleteAsync(user);
             return true;
         }
+
+        public async Task<bool> ChangeUserPasswordAsync(UserChangePasswordDto dto)
+        {
+            var user = await _unitOfWork.Users.FindAsync(u => u.Id == dto.UserId);
+            if (user == null)
+            {
+                return false; // Пользователь не найден
+            }
+
+            // Проверяем текущий пароль
+            var result = _userpasswordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.CurrentPassword);
+            if (result == PasswordVerificationResult.Failed)
+            {
+                return false; // Неверный текущий пароль
+            }
+
+            // Хешируем новый пароль
+            user.PasswordHash = _userpasswordHasher.HashPassword(user, dto.NewPassword);
+
+            await _unitOfWork.Users.UpdateAsync(user);
+            return true;
+        }
+
     }
 }

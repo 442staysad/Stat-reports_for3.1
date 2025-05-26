@@ -16,6 +16,7 @@ namespace Core.Interfaces
         Task<bool> DeleteUserAsync(int id);
         Task<IEnumerable<User>> GetUsersByBranchIdAsync(int branchId);
         Task<IEnumerable<User>> GetUsersByRoleAsync(string role);
+        Task<bool> ChangeUserPasswordAsync(UserChangePasswordDto dto); // НОВЫЙ МЕТОД
 
     }
 }

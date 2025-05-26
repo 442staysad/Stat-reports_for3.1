@@ -3,8 +3,12 @@
 @{
     ViewData["Title"] = "Профиль пользователя";
 
-    // Определяем, разрешено ли пользователю редактировать данные филиала
     bool isBranchEditable = User.IsInRole("AdminBranch") || User.IsInRole("Admin") || User.IsInRole("AdminTrest");
+
+    // Инициализация моделей для смены пароля (чтобы не было null при первом отображении)
+    // Эти модели будут переданы в Partial Views
+    var userChangePasswordModel = new Stat_reports.ViewModels.UserChangePasswordViewModel { UserId = Model.UserId };
+    var branchChangePasswordModel = new Stat_reports.ViewModels.BranchChangePasswordViewModel { BranchId = Model.BranchId };
 }
 
 @section Styles {
@@ -60,12 +64,58 @@
             border-color: rgba(255, 255, 255, 0.2);
             cursor: default; /* Меняем курсор, чтобы показать, что поле не редактируется */
         }
+        /* Дополнительные стили для модалок, чтобы они соответствовали теме */
+        .modal-content {
+            background: #003366; /* Темный фон для модалки */
+            color: white;
+            border-radius: 15px;
+        }
+
+        .modal-header {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-header .close { /* кнопка закрытия модалки */
+            color: white;
+            opacity: 0.8;
+            font-size: 2rem;
+        }
+
+            .modal-header .close:hover {
+                opacity: 1;
+            }
+
+        .btn-secondary { /* кнопка закрытия в модалке */
+            background-color: #6c757d;
+            border-color: #6c757d;
+            color: white;
+        }
+
+        .btn-primary-modal { /* кнопка сохранения в модалке */
+            background-color: #ffcc00;
+            color: #003366;
+            border: none;
+            font-weight: bold;
+        }
     </style>
 }
 
 <div class="main-container">
     <h2 class="text-center mb-4">@ViewData["Title"]</h2>
 
+    @* Общие сообщения об успехе или ошибке (например, от TempData) *@
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
 
     <form asp-action="Profile" method="post">
         <div class="section-title">👤 Данные пользователя</div>
@@ -75,14 +125,18 @@
             <div class="col-md-6">
                 <label>ФИО</label>
                 <input asp-for="FullName" class="form-control" />
+                <span asp-validation-for="FullName" class="text-danger"></span>
                 <label>Телефон</label>
                 <input asp-for="Number" class="form-control" />
+                <span asp-validation-for="Number" class="text-danger"></span>
             </div>
             <div class="col-md-6">
                 <label>Email</label>
                 <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
                 <label>Должность</label>
                 <input asp-for="Position" class="form-control" />
+                <span asp-validation-for="Position" class="text-danger"></span>
             </div>
         </div>
 
@@ -92,55 +146,100 @@
         <div class="row">
             <div class="col-md-6">
                 <label>Название</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="Name" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="Name" class="text-danger"></span>
                 <label>Краткое название</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="Shortname" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="Shortname" class="text-danger"></span>
                 <label>Регион</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="Region" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="Region" class="text-danger"></span>
                 <label>Адрес</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="Address" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="Address" class="text-danger"></span>
             </div>
             <div class="col-md-6">
                 <label>УНП</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="UNP" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="UNP" class="text-danger"></span>
                 <label>ОКПО</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="OKPO" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="OKPO" class="text-danger"></span>
                 <label>ОКЮЛП</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="OKYLP" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="OKYLP" class="text-danger"></span>
                 <label>Email филиала</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="BranchEmail" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="BranchEmail" class="text-danger"></span>
             </div>
         </div>
 
         <div class="row mt-3">
             <div class="col-md-6">
                 <label>Подчинение</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="GoverningName" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="GoverningName" class="text-danger"></span>
                 <label>Руководитель</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="HeadName" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="HeadName" class="text-danger"></span>
             </div>
             <div class="col-md-6">
                 <label>Куратор</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="Supervisor" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="Supervisor" class="text-danger"></span>
                 <label>Главный бухгалтер</label>
-                @* Corrected syntax for Tag Helper boolean attribute *@
                 <input asp-for="ChiefAccountant" class="form-control" readonly="@(!isBranchEditable)" />
+                <span asp-validation-for="ChiefAccountant" class="text-danger"></span>
             </div>
         </div>
 
         <div class="text-center mt-4">
-            <button type="submit" class="btn btn-save px-4 py-2">💾 Сохранить</button>
+            <button type="submit" class="btn btn-save px-4 py-2">💾 Сохранить данные профиля</button>
         </div>
     </form>
-</div>
+
+    <hr class="mt-5" />
+
+    <div class="text-center mt-4">
+        <button type="button" class="btn btn-save px-4 py-2" data-bs-toggle="modal" data-bs-target="#changeUserPasswordModal">
+            🔑 Сменить пароль пользователя
+        </button>
+
+        @if (isBranchEditable)
+        {
+            <button type="button" class="btn btn-save px-4 py-2 ml-3" data-bs-toggle="modal" data-bs-target="#changeBranchPasswordModal">
+                🔒 Сменить пароль филиала
+            </button>
+        }
+    </div>
+
+    @await Html.PartialAsync("_ChangeUserPasswordModal", userChangePasswordModel)
+
+    @if (isBranchEditable)
+    {
+        @await Html.PartialAsync("_ChangeBranchPasswordModal", branchChangePasswordModel)
+    }
+
+    @section Scripts {
+        @{
+            await Html.RenderPartialAsync("_ValidationScriptsPartial");
+        }
+
+        <script>
+            // JavaScript для сброса форм модальных окон при их закрытии,
+            // чтобы валидационные сообщения не оставались
+            $('#changeUserPasswordModal').on('hidden.bs.modal', function () {
+                $(this).find('form')[0].reset(); // Сбрасываем форму
+                $(this).find('.text-danger').empty();
+                $(this).find('.form-control').removeClass('input-validation-error');
+                $(this).find('.validation-summary-errors').empty();
+            });
+
+            $('#changeBranchPasswordModal').on('hidden.bs.modal', function () {
+                $(this).find('form')[0].reset(); // Сбрасываем форму
+                $(this).find('.text-danger').empty();
+                $(this).find('.form-control').removeClass('input-validation-error');
+                $(this).find('.validation-summary-errors').empty();
+            });
+        </script>
+    }

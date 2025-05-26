@@ -102,14 +102,9 @@ namespace Stat_reports
             app.UseSession();
             app.UseAuthentication();
             app.UseAuthorization();
-
+            
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapAreaControllerRoute(
-                    name: "admin",
-                    areaName: "Admin",
-                    pattern: "Admin/{controller=Admin}/{action=Index}/{id?}");
-
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller=ReportMvc}/{action=WorkingReports}/{id?}");
