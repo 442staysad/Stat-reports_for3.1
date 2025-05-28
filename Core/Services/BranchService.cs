@@ -55,28 +55,38 @@ namespace Core.Services
 
         public async Task<IEnumerable<BranchDto>> GetAllBranchesDtosAsync()
         {
-            return (await _unitOfWork.Branches.GetAllAsync()).Select(b => new BranchDto
-            {
-                Id=b.Id,
-                Name = b.Name,
-                Shortname = b.Shortname,
-                UNP = b.UNP!,
-                OKPO = b.OKPO,
-                OKYLP = b.OKYLP,
-                Region = b.Region,
-                Address = b.Address,
-                Email = b.Email,
-                GoverningName = b.GoverningName,
-                HeadName = b.HeadName,
-                Supervisor = b.Supervisor,
-                ChiefAccountant = b.ChiefAccountant,
-                Password = "" // not returned
-            });
+            // Получаем все филиалы
+            var allBranches = await _unitOfWork.Branches.GetAllAsync();
+
+            // Фильтруем, исключая те, у которых имя "Admin", и затем преобразуем в DTO
+            return allBranches
+                .Where(b => b.Name != "Admin") // <-- ДОБАВЛЕНА ФИЛЬТРАЦИЯ
+                .Select(b => new BranchDto
+                {
+                    Id = b.Id,
+                    Name = b.Name,
+                    Shortname = b.Shortname,
+                    UNP = b.UNP!,
+                    OKPO = b.OKPO,
+                    OKYLP = b.OKYLP,
+                    Region = b.Region,
+                    Address = b.Address,
+                    Email = b.Email,
+                    GoverningName = b.GoverningName,
+                    HeadName = b.HeadName,
+                    Supervisor = b.Supervisor,
+                    ChiefAccountant = b.ChiefAccountant,
+                    Password = "" // not returned
+                }).ToList();
         }
 
         public async Task<IEnumerable<Branch>> GetAllBranchesAsync()
         {
-            return await _unitOfWork.Branches.GetAllAsync();
+            // Получаем все филиалы
+            var allBranches = await _unitOfWork.Branches.GetAllAsync();
+
+            // Фильтруем, исключая те, у которых имя "Admin"
+            return allBranches.Where(b => b.Name != "Admin").ToList(); // <-- ДОБАВЛЕНА ФИЛЬТРАЦИЯ
         }
 
         public async Task<Branch> GetBranchByIdAsync(int? id)

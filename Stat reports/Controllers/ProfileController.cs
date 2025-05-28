@@ -102,7 +102,6 @@ namespace Stat_reports.Controllers
         [HttpPost]
         public async Task<IActionResult> ChangeUserPassword(UserChangePasswordViewModel model)
         {
-            Console.WriteLine($"!!!!!!!!!!!!!!!! {model.ConfirmNewPassword} {model.NewPassword} {model.CurrentPassword}");
             // Валидация модели
             if (!ModelState.IsValid)
             {
