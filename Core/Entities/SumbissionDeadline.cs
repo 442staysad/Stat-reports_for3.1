@@ -27,6 +27,7 @@ namespace Core.Entities
             = new List<CommentHistory>();
 
         public bool IsClosed { get; set; } // Новый флаг
+        public bool Reopened { get; set; }=false; // Новый флаг для отслеживания повторного открытия дедлайна
         public ReportStatus? Status { get; set; } = ReportStatus.InProgress;
 
     }

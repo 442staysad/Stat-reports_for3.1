@@ -143,6 +143,7 @@ namespace Core.Services
             var report = await _unitOfWork.Reports.FindAsync(r => r.Id== deadline.ReportId);
             if (deadline== null) return false;
             await _unitOfWork.SubmissionDeadlines.DeleteAsync(deadline);
+            if (report!=null)
             await _fileService.DeleteFileAsync(report.FilePath);
             return true;
         }

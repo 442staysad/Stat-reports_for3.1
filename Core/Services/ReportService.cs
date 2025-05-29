@@ -202,10 +202,13 @@ namespace Core.Services
                     await _unitOfWork.Reports.UpdateAsync(report);
                     await _unitOfWork.SubmissionDeadlines.UpdateAsync(deadline);
                     // Создаем новый дедлайн вместо обновления
-                    await _deadlineService.CheckAndUpdateDeadlineAsync(
-                        report.TemplateId,
-                        (int)report.BranchId, reportId);
-
+                    if (!deadline.Reopened)
+                    {
+                        await _deadlineService.CheckAndUpdateDeadlineAsync(
+                            report.TemplateId,
+                            (int)report.BranchId, reportId);
+                    }
+                    deadline.Reopened = false; // Сбрасываем флаг повторного открытия
                     var users = await _unitOfWork.Users.FindAllAsync(
                         u => u.BranchId == report.BranchId);
 
@@ -443,7 +446,11 @@ namespace Core.Services
             if (report == null|| deadline==null) return null;
             report.IsClosed = false;
             deadline.IsClosed = false;
+            deadline.Status = ReportStatus.NeedsCorrection;
+            deadline.Reopened = true;
             await _unitOfWork.Reports.UpdateAsync(report);
+            await _unitOfWork.SubmissionDeadlines.UpdateAsync(deadline);
+            await _unitOfWork.SaveChangesAsync();
             return MapToDto(report);
         }
 

@@ -385,7 +385,7 @@ namespace Stat_reports.Controllers
         public async Task<IActionResult> ReopenReport(int reportId)
         {
             await _reportService.ReopenReportAsync(reportId);
-            return View();
+            return RedirectToAction(nameof(ReportArchive));
         }
 
         [HttpGet("download/{reportId}")]
