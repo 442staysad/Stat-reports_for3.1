@@ -72,10 +72,10 @@ namespace Core.Services
                 };
                 switch (deadlineType)
                 {
-                    case DeadlineType.Monthly : deadline.Period = ReportDate.AddMonths(1); break;
-                    case DeadlineType.Quarterly : deadline.Period = ReportDate.AddMonths(3); break;
-                    case DeadlineType.HalfYearly: deadline.Period = ReportDate.AddMonths(6); break;
-                    case DeadlineType.Yearly: deadline.Period = ReportDate.AddYears(1); break;
+                    case DeadlineType.Monthly : deadline.Period = ReportDate; break;
+                    case DeadlineType.Quarterly : deadline.Period = ReportDate; break;
+                    case DeadlineType.HalfYearly: deadline.Period = ReportDate; break;
+                    case DeadlineType.Yearly: deadline.Period = ReportDate; break;
                 }
                 // Сохранение дедлайна в базе данных
                 await _unitOfWork.SubmissionDeadlines.AddAsync(deadline);

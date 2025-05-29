@@ -108,7 +108,7 @@ namespace Core.Services
             return true;
         }
 
-        public async Task<ReportDto> UploadReportAsync(int templateId, int branchId, int uploadedById, IFormFile file)
+        public async Task<ReportDto> UploadReportAsync(int templateId, int branchId, int uploadedById, IFormFile file,int deadlineId)
         {
             if (file == null || file.Length == 0)
                 throw new ArgumentException("Файл отсутствует или пуст");
@@ -119,12 +119,11 @@ namespace Core.Services
             var template = await _unitOfWork.ReportTemplates.FindAsync(t => t.Id == templateId)
                            ?? throw new ArgumentException("Шаблон не найден");
 
-            var deadline = await _unitOfWork.SubmissionDeadlines.FindAsync(d =>
-                d.ReportTemplateId == templateId && d.BranchId == branchId)
+            var deadline = await _unitOfWork.SubmissionDeadlines.FindAsync(d =>d.Id==deadlineId)
                 ?? throw new ArgumentException("Срок сдачи не найден");
 
             var existingReport = await _unitOfWork.Reports.FindAsync(r =>
-                r.TemplateId == templateId && r.BranchId == branchId && r.Period == deadline.Period);
+                r.Id==deadline.ReportId);
 
             var filePath = await _fileService.SaveFileAsync(file, "Reports", branch.Name, DateTime.Now.Year, template.Name);
 
@@ -171,11 +170,7 @@ namespace Core.Services
 
             var user = await _unitOfWork.Users.GetAll(u => u.Include(r => r.Role))
                 .Where(u => u.Id == uploadedById).FirstOrDefaultAsync();
-
-            if (user?.Role?.RoleName != "User")
-                await UpdateReportStatusAsync(deadline.Id,createdReport.Id, ReportStatus.Reviewed);
-
-            
+                      
 
             return MapToDto(createdReport);
         }
@@ -203,11 +198,13 @@ namespace Core.Services
                     // Помечаем текущий дедлайн как закрытый
                     deadline.IsClosed = true;
                     deadline.ReportId = reportId; // Связываем с отчетом
-
+                    report.IsClosed = true; // Закрываем отчет
+                    await _unitOfWork.Reports.UpdateAsync(report);
+                    await _unitOfWork.SubmissionDeadlines.UpdateAsync(deadline);
                     // Создаем новый дедлайн вместо обновления
                     await _deadlineService.CheckAndUpdateDeadlineAsync(
                         report.TemplateId,
-                        (int)report.BranchId);
+                        (int)report.BranchId, reportId);
 
                     var users = await _unitOfWork.Users.FindAllAsync(
                         u => u.BranchId == report.BranchId);
@@ -302,6 +299,8 @@ namespace Core.Services
                 Status = (ReportStatus)d.Status,
                 Comment = d.Comment,
                 ReportType = d.Template?.Type.ToString(),
+                Period = d.Period,
+                Type = (DeadlineType)(d.Template?.DeadlineType),// Используем DeadlineType из шаблона
                 BranchId = d.BranchId,
                 CommentHistory = d.CommentHistory?
                     .OrderByDescending(c => c.CreatedAt)

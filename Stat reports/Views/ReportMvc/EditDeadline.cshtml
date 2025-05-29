@@ -1,0 +1,85 @@
+﻿@model Stat_reports.ViewModels.EditDeadlineViewModel
+
+@{
+    ViewData["Title"] = "Изменить срок сдачи";
+}
+
+@section Styles {
+    <style>
+        body {
+            background: linear-gradient(to right, #003366, #0066cc);
+            color: white;
+            padding-top: 40px;
+        }
+
+        .main-container {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 800px;
+            margin: auto;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+        }
+
+        label {
+            color: #fff;
+        }
+
+        .form-check-label {
+            margin-left: 5px;
+        }
+    </style>
+}
+
+<div class="main-container">
+    <h2 class="text-center mb-4">Изменить срок сдачи</h2>
+    <h5 class="text-center mb-3 text-warning">@Model.TemplateName - @Model.BranchName</h5>
+
+    <form asp-action="EditDeadline" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" />
+
+        @* Если НЕ нужно менять филиал и шаблон, то используйте скрытые поля *@
+        @* <input type="hidden" asp-for="BranchId" /> *@
+        @* <input type="hidden" asp-for="ReportTemplateId" /> *@
+
+        @* Если НУЖНО менять филиал и шаблон, используйте dropdowns *@
+        <div class="mb-3">
+            <label asp-for="BranchId" class="form-label"></label>
+            <select asp-for="BranchId" class="form-select" asp-items="Model.Branches">
+                <option value="">Выберите филиал...</option>
+            </select>
+            <span asp-validation-for="BranchId" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="ReportTemplateId" class="form-label"></label>
+            <select asp-for="ReportTemplateId" class="form-select" asp-items="Model.Templates">
+                <option value="">Выберите шаблон...</option>
+            </select>
+            <span asp-validation-for="ReportTemplateId" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Period" class="form-label"></label>
+            <input asp-for="Period" class="form-control" type="date" required />
+            <span asp-validation-for="Period" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="DeadlineDate" class="form-label"></label>
+            <input asp-for="DeadlineDate" class="form-control" type="date" required />
+            <span asp-validation-for="DeadlineDate" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3 form-check">
+            <input asp-for="IsClosed" class="form-check-input" type="checkbox" />
+            <label asp-for="IsClosed" class="form-check-label"></label>
+        </div>
+
+        <div class="text-center mt-4">
+            <button type="submit" class="btn btn-warning">Сохранить изменения</button>
+            <a asp-action="WorkingReports" class="btn btn-secondary">Отмена</a> @* <-- Или ссылка на список дедлайнов *@
+        </div>
+    </form>
+</div>

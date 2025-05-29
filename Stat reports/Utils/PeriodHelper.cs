@@ -21,7 +21,7 @@ namespace Stat_reports.Utils // Или ваше основное простра�
                     // Получаем название месяца в именительном падеже и с заглавной буквы
                     string monthNameNominative = RussianCulture.DateTimeFormat.GetMonthName(month);
                     monthNameNominative = char.ToUpper(monthNameNominative[0], RussianCulture) + monthNameNominative.Substring(1);
-                    return $"Месяц ({monthNameNominative}) Год ({year})";
+                    return $"{monthNameNominative} {year} г. ";
 
                 case DeadlineType.Quarterly:
                     string quarterStr;
@@ -50,14 +50,14 @@ namespace Stat_reports.Utils // Или ваше основное простра�
                     startMonthName = char.ToUpper(startMonthName[0], RussianCulture) + startMonthName.Substring(1);
                     endMonthName = char.ToUpper(endMonthName[0], RussianCulture) + endMonthName.Substring(1);
                     quarterStr = $"{startMonthName}-{endMonthName}";
-                    return $"Квартал ({quarterStr}) Год ({year})";
+                    return $"{quarterStr} {year} г. " ;
 
                 case DeadlineType.HalfYearly:
-                    string halfYearStr = (month >= 1 && month <= 6) ? "1-е полугодие" : "2-е полугодие";
-                    return $"Полугодие ({halfYearStr}) Год ({year})";
+                    string halfYearStr = (month >= 1 && month <= 6) ? "Январь-Июнь" : "Июль-Декабрь";
+                    return $"{halfYearStr} {year} г.";
 
                 case DeadlineType.Yearly:
-                    return $"Год ({year})";
+                    return $"{year} г.";
 
                 default:
                     // Резервный вариант, если тип не определен

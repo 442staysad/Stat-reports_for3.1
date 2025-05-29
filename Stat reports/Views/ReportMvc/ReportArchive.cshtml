@@ -1,13 +1,14 @@
 ﻿@model Stat_reports.ViewModels.ReportArchiveViewModel
 @{
     ViewData["Title"] = "Архив отчетов";
+    bool allowed = User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF")||User.IsInRole("AdminTrest");
 }
 @section Styles {
 <link rel="stylesheet" href="~/css/archive.css" />
 <style>
     /* Добавьте стиль для скрытия групп полей */
     .archive-period-group {
-        display: none;
+    display: none;
     }
 </style>
 }
@@ -34,9 +35,9 @@
                 @foreach (var template in Model.Templates)
                 {
                     <option value="@template.Id"
-                            data-type="@template.Type"
-                            data-period-type="@template.DeadlineType" 
-                            selected="@(template.Id == Model.Filter.TemplateId)">
+                    data-type="@template.Type"
+                    data-period-type="@template.DeadlineType" 
+                    selected="@(template.Id == Model.Filter.TemplateId)">
                         @template.Name
                     </option>
                 }
@@ -66,15 +67,15 @@
                     var userBranch = Model.Branches.FirstOrDefault(b => b.Id == Model.Filter.BranchId);
                     <input type="hidden" name="branchId" value="@userBranch.Id" />
                     <select class="form-select" id="branchId" disabled>
-                         <option value="@userBranch.Id" selected>@userBranch.Name</option>
+                        <option value="@userBranch.Id" selected>@userBranch.Name</option>
                     </select>
                 }
                 else
                 {
-                     @* Если по какой-то причине у User нет филиала в Filter.BranchId,
+                    @* Если по какой-то причине у User нет филиала в Filter.BranchId,
                         можно добавить пустой disabled select или сообщение *@
                     <select class="form-select" id="branchId" disabled>
-                         <option value="">Не определен</option>
+                        <option value="">Не определен</option>
                     </select>
                 }
             </div>
@@ -84,7 +85,7 @@
         <div id="archive-year-group" class="col-md-3 archive-period-group">
             <label for="Year" class="form-label">Год:</label>
             <input type="number" class="form-control" id="Year" name="Year"
-                   min="2000" max="2100" value="@(Model.Filter.Year ?? DateTime.Now.Year)" /> 
+            min="2000" max="2100" value="@(Model.Filter.Year ?? DateTime.Now.Year)" /> 
         </div>
 
         <div id="archive-month-group" class="col-md-3 archive-period-group">
@@ -103,11 +104,11 @@
         <div id="archive-quarter-group" class="col-md-3 archive-period-group">
             <label for="Quarter" class="form-label">Квартал:</label>
             <select class="form-select" id="Quarter" name="Quarter">
-                 <option value="">-- Выберите квартал --</option> 
-                <option value="1" selected="@(Model.Filter.Quarter == 1)">I квартал</option>
-                <option value="2" selected="@(Model.Filter.Quarter == 2)">II квартал</option>
-                <option value="3" selected="@(Model.Filter.Quarter == 3)">III квартал</option>
-                <option value="4" selected="@(Model.Filter.Quarter == 4)">IV квартал</option>
+                <option value="">-- Выберите квартал --</option> 
+                <option value="1" selected="@(Model.Filter.Quarter == 1)">Январь-Март</option>
+                <option value="2" selected="@(Model.Filter.Quarter == 2)">Апрель-Июнь</option>
+                <option value="3" selected="@(Model.Filter.Quarter == 3)">Июль-Сентябрь</option>
+                <option value="4" selected="@(Model.Filter.Quarter == 4)">Октябрь-Декабрь</option>
             </select>
         </div>
 
@@ -115,8 +116,8 @@
             <label for="HalfYearPeriod" class="form-label">Полугодие:</label>
             <select class="form-select" id="HalfYearPeriod" name="HalfYearPeriod">
                 <option value="">-- Выберите полугодие --</option> 
-                <option value="1" selected="@(Model.Filter.HalfYearPeriod == 1)">I полугодие</option>
-                <option value="2" selected="@(Model.Filter.HalfYearPeriod == 2)">II полугодие</option>
+                <option value="1" selected="@(Model.Filter.HalfYearPeriod == 1)">Январь-Июнь</option>
+                <option value="2" selected="@(Model.Filter.HalfYearPeriod == 2)">Июль-Декабрь</option>
             </select>
         </div>
 
@@ -157,8 +158,8 @@
                                     <span class="report-badge plan">Плановый</span>
                                     break;
                                 default:
-                                     <span>Неизвестно</span>
-                                     break;
+                                    <span>Неизвестно</span>
+                                    break;
                             }
                         </td>
                         <td>@Model.Branches.FirstOrDefault(b => b.Id == report.BranchId)?.Name</td>
@@ -177,31 +178,31 @@
                             @if (!string.IsNullOrEmpty(report.Comment))
                             {
                                 <button type="button"
-                                        class="btn btn-sm btn-info"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#commentModal-@report.Id">
+                                class="btn btn-sm btn-info"
+                                data-bs-toggle="modal"
+                                data-bs-target="#commentModal-@report.Id">
                                     Комментарий
                                 </button>
 
                                 <div class="modal fade" id="commentModal-@report.Id"
-                                     tabindex="-1"
-                                     aria-labelledby="modalLabel-@report.Id"
-                                     aria-hidden="true">
+                                tabindex="-1"
+                                aria-labelledby="modalLabel-@report.Id"
+                                aria-hidden="true">
                                     <div class="modal-dialog">
                                         <div class="modal-content">
                                             <div class="modal-header">
                                                 <h5 class="modal-title" id="modalLabel-@report.Id">Комментарий</h5>
                                                 <button type="button" class="btn-close"
-                                                        data-bs-dismiss="modal"
-                                                        aria-label="Закрыть"></button>
+                                                data-bs-dismiss="modal"
+                                                aria-label="Закрыть"></button>
                                             </div>
                                             <div class="modal-body">
                                                 @report.Comment
                                             </div>
                                             <div class="modal-footer">
                                                 <button type="button"
-                                                        class="btn btn-secondary"
-                                                        data-bs-dismiss="modal">Закрыть</button>
+                                                class="btn btn-secondary"
+                                                data-bs-dismiss="modal">Закрыть</button>
                                             </div>
                                         </div>
                                     </div>
@@ -210,22 +211,24 @@
                         </td>
                         <td>
                             <a asp-action="PreviewExcel"
-                               asp-route-reportId="@report.Id"
-                               asp-route-isArchive="@true"
-                               class="btn btn-sm btn-primary">
+                            asp-route-reportId="@report.Id"
+                            asp-route-isArchive="@true"
+                            class="btn btn-sm btn-primary">
                                 Просмотр
                             </a>
                             <a asp-action="DownloadReport"
-                               asp-route-reportname="@report.Name"
-                               asp-route-reportId="@report.Id"
-                               class="btn btn-sm btn-primary">
+                            asp-route-reportname="@report.Name"
+                            asp-route-reportId="@report.Id"
+                            class="btn btn-sm btn-primary">
                                 ⬇ Скачать
                             </a>
-                            <form method="post" asp-action="ReopenReport" asp-route-reportId="@report.Id" class="d-inline">
-                                <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Вы уверены, что хотите открыть отчет для редактирования?')">
+                            @if (allowed)
+                            {
+                                <form method="post" asp-action="ReopenReport" asp-route-reportId="@report.Id" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Вы уверены, что хотите открыть отчет для редактирования?')">
                                     🔓 Открыть
                                 </button>
-                            </form>
+                            </form>}
                         </td>
                     </tr>
                 }

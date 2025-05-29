@@ -1,0 +1,108 @@
+﻿@model Stat_reports.ViewModels.EditTemplateViewModel
+
+@{
+    ViewData["Title"] = "Изменить шаблон";
+    var allowedTypes = Model.AllowedTypes ?? new List<ReportType>(); // Используем Model.AllowedTypes
+}
+
+@section Styles {
+    <style>
+        body {
+            background: linear-gradient(to right, #003366, #0066cc);
+            color: white;
+            padding-top: 40px;
+        }
+
+        .main-container {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 800px;
+            margin: auto;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+        }
+
+        label {
+            color: #fff;
+        }
+
+        .current-file-info {
+            font-size: 0.9em;
+            font-style: italic;
+            margin-bottom: 10px;
+            background-color: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+}
+
+<div class="main-container">
+    <h2 class="text-center mb-4">Изменить шаблон отчета</h2>
+
+    <form asp-action="EditTemplate" method="post" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" /> @* <-- Скрытое поле ID *@
+        <input type="hidden" asp-for="CurrentFilePath" /> @* <-- Скрытое поле для текущего пути, если нужно *@
+
+        <div class="mb-3">
+            <label asp-for="Name" class="form-label"></label>
+            <input asp-for="Name" class="form-control" required />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="CurrentFilePath" class="form-label"></label>
+            @if (!string.IsNullOrEmpty(Model.CurrentFilePath))
+            {
+                <div class="current-file-info">
+					@System.IO.Path.GetFileName(Model.CurrentFilePath).ToString() 
+                    @* Можно добавить ссылку для скачивания текущего шаблона, если нужно *@
+                </div>
+            }
+            else
+            {
+                <div class="current-file-info text-warning">Файл шаблона не загружен.</div>
+            }
+            <label asp-for="NewFile" class="form-label"></label>
+            <input asp-for="NewFile" type="file" name="NewFile" class="form-control" accept=".xls,.xlsx" />
+            <span asp-validation-for="NewFile" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Description" class="form-label"></label>
+            <input asp-for="Description" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Type" class="form-label"></label>
+            <select asp-for="Type" class="form-select" asp-items="@(new SelectList(allowedTypes.Select(t => new { Value = t, Text = t == ReportType.Plan ? "Плановый" : "Бухгалтерский" }), "Value", "Text"))">
+            </select>
+            <span asp-validation-for="Type" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="DeadlineType" class="form-label"></label>
+            <select asp-for="DeadlineType" class="form-select">
+                @foreach (var type in Enum.GetValues(typeof(DeadlineType)).Cast<DeadlineType>())
+                {
+                    var text = type switch
+                    {
+                        DeadlineType.Monthly => "Месячный",
+                        DeadlineType.Quarterly => "Квартальный",
+                        DeadlineType.HalfYearly => "Полугодовой",
+                        DeadlineType.Yearly => "Годовой",
+                        _ => type.ToString()
+                    };
+                    <option value="@type">@text</option>
+                }
+            </select>
+            <span asp-validation-for="DeadlineType" class="text-danger"></span>
+        </div>
+
+        <div class="text-center mt-4">
+            <button type="submit" class="btn btn-warning">Сохранить изменения</button>
+            <a asp-action="WorkingReports" class="btn btn-secondary">Отмена</a> 
+        </div>
+    </form>
+</div>

@@ -10,6 +10,8 @@ namespace Stat_reports.ViewModels
         public string TemplateName { get; set; }
         public string ReportType {  get; set; }
         public DateTime Deadline { get; set; }
+        public DateTime Period { get; set; }
+        public DeadlineType Type { get; set; } // Тип дедлайна (ежемесячный, квартальный и т.д.)
         public ReportStatus Status { get; set; }
         public string? Comment { get; set; }
         public int? ReportId { get; set; }

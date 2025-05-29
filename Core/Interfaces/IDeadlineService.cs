@@ -9,9 +9,10 @@ namespace Core.Interfaces
     public interface IDeadlineService
     {
        Task<IEnumerable<SubmissionDeadline>> GetAllAsync();
-        Task CheckAndUpdateDeadlineAsync(int templateId, int branchId);
+        Task CheckAndUpdateDeadlineAsync(int templateId, int branchId, int? reportId=null);
         DateTime CalculateDeadline(DeadlineType deadlineType, int fixedDay, DateTime reportDate);
         Task<bool> DeleteDeadlineAsync(int id);
         Task<SubmissionDeadline> GetDeadlineByIdAsync(int id);
+        Task UpdateDeadlineAsync(SubmissionDeadline deadlineToUpdate);
     }
 }

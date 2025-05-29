@@ -28,7 +28,7 @@ namespace Stat_reports.Controllers
             return View(posts); // Передаем список Post
         }
 
-        [Authorize(Roles = "Admin,OBUnF,PEB")]
+        [Authorize(Roles = "Admin,OBUnF,PEB,AdminTrest")]
         [HttpPost]
         public async Task<IActionResult> AddPost(string header, string text)
         {
@@ -36,6 +36,18 @@ namespace Stat_reports.Controllers
             if (user != null)
             {
                 await _postService.AddPostAsync(header, text, (int)user);
+            }
+            return RedirectToAction("Index");
+        }
+
+        [Authorize(Roles = "Admin,OBUnF,PEB,AdminTrest")]
+        [HttpPost]
+        public async Task<IActionResult> DeletePost(int postId)
+        {
+            var user = HttpContext.Session.GetInt32("UserId");
+            if (user != null)
+            {
+                await _postService.DeletePostAsync(postId);
             }
             return RedirectToAction("Index");
         }

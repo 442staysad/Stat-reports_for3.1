@@ -44,5 +44,12 @@ namespace Core.Services
             await _unitOfWork.SaveChangesAsync();
             return post;
         }
+
+        public async Task DeletePostAsync(int postId)
+        {
+            var post = await _unitOfWork.Posts.FindAsync(p => p.Id == postId);
+            await _unitOfWork.Posts.DeleteAsync(post);
+            await _unitOfWork.SaveChangesAsync();
+        }
     }
 }

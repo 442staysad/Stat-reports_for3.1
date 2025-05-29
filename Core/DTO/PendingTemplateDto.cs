@@ -13,10 +13,12 @@ namespace Core.DTO
         public int TemplateId { get; set; }
         public string TemplateName { get; set; }
         public DateTime Deadline { get; set; }
+        public DateTime Period { get; set; } // Период отчета, если есть
         public ReportStatus Status { get; set; }
         public string? Comment { get; set; }
         public int? ReportId { get; set; } // ID загруженного отчета (если есть)
         public string ReportType { get; set; }
+        public DeadlineType Type { get; set; } // Тип дедлайна (ежемесячный, квартальный и т.д.)
         public int? BranchId { get; set; }
 
         // Новое поле: история комментариев

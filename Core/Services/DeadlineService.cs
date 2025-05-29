@@ -9,6 +9,7 @@ using Core.Interfaces;
 using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using NPOI.SS.Formula.Functions;
 
 namespace Core.Services
 {
@@ -36,24 +37,20 @@ namespace Core.Services
                                                           .Include(b => b.Branch))
                                                           .ToListAsync();
 
-        public async Task CheckAndUpdateDeadlineAsync(int templateId, int branchId)
+        public async Task CheckAndUpdateDeadlineAsync(int templateId, int branchId, int? reportid=null)
         {
-            using var transaction = await _unitOfWork.BeginTransactionAsync();
-            try
-            {
-                var repo = _unitOfWork.SubmissionDeadlines;
 
-                // Находим последний закрытый дедлайн для данного шаблона и филиала
-                var lastDeadline = await repo.FindAsync(
-                    d => d.ReportTemplateId == templateId &&
+               // Находим последний закрытый дедлайн для данного шаблона и филиала
+               var lastDeadline = await _unitOfWork.SubmissionDeadlines.FindAsync(
+                    d => d.ReportId == (int)reportid &&
                          d.BranchId == branchId &&
                          d.IsClosed,
                     includes: q => q.Include(d => d.Template)
                                   .Include(d => d.Branch));
-
+                
                 if (lastDeadline == null)
                 {
-                    _logger.LogWarning($"Не найден закрытый дедлайн для templateId: {templateId}, branchId: {branchId}");
+                    _logger.LogWarning($"Не найден закрытый дедлайн для templateId:{reportid} {templateId}, branchId: {branchId}");
                     return;
                 }
 
@@ -80,17 +77,22 @@ namespace Core.Services
                 // Закрываем предыдущий дедлайн
                 lastDeadline.IsClosed = true;
 
-                await repo.UpdateAsync(lastDeadline);
-                await repo.AddAsync(newDeadline);
+                await _unitOfWork.SubmissionDeadlines.UpdateAsync(lastDeadline);
+                await _unitOfWork.SubmissionDeadlines.AddAsync(newDeadline);
+                await _unitOfWork.SaveChangesAsync();
 
-                await transaction.CommitAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка при создании нового дедлайна");
-                await transaction.RollbackAsync();
-                throw;
-            }
+        }
+
+        public async Task UpdateDeadlineAsync(SubmissionDeadline deadlineToUpdate)
+        {
+            if (deadlineToUpdate == null) throw new ArgumentNullException(nameof(deadlineToUpdate));
+            var existingDeadline = await _unitOfWork.SubmissionDeadlines.FindAsync(r => r.Id == deadlineToUpdate.Id);
+            if (existingDeadline == null) throw new KeyNotFoundException($"Дедлайн с ID {deadlineToUpdate.Id} не найден.");
+            existingDeadline.DeadlineType = deadlineToUpdate.DeadlineType;
+            existingDeadline.FixedDay = deadlineToUpdate.FixedDay;
+            existingDeadline.DeadlineDate = deadlineToUpdate.DeadlineDate;
+            existingDeadline.Period = deadlineToUpdate.Period;
+            await _unitOfWork.SubmissionDeadlines.UpdateAsync(existingDeadline);
         }
 
         private DateTime AdjustDate(DateTime date, int fixedDay)

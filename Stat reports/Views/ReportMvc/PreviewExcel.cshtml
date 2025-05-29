@@ -152,7 +152,7 @@
             </form>
 
             <div class="d-flex gap-2">
-                <form asp-action="AcceptReport" method="post" class="mb-2">
+                <form asp-action="AcceptReport" asp-controller="ReportMvc" method="post" class="mb-2">
                     <input type="hidden" name="deadlineId" value="@Model.DeadlineId" />
                     <input type="hidden" name="reportId" value="@Model.ReportId" />
                     <button type="submit" class="btn btn-success">Принять отчет</button>

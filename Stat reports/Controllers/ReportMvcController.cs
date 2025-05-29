@@ -13,6 +13,7 @@ using Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Stat_reports.ViewModels;
 using Stat_reportsnt.Filters;
 namespace Stat_reports.Controllers
@@ -51,7 +52,7 @@ namespace Stat_reports.Controllers
             return View(reports);
         }
 
-        public IActionResult Upload()
+        public IActionResult UploadReport()
         {
             return View();
         }
@@ -69,11 +70,6 @@ namespace Stat_reports.Controllers
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
             var allowedExtensions = new[] { ".xls", ".xlsx" };
 
-            if (!allowedExtensions.Contains(extension))
-            {
-                TempData["Error"] = "Разрешены только Excel-файлы (.xls, .xlsx)";
-                return RedirectToAction(nameof(WorkingReports));
-            }
 
             int? userId = HttpContext.Session.GetInt32("UserId");
             int? branchId = HttpContext.Session.GetInt32("BranchId");
@@ -84,7 +80,7 @@ namespace Stat_reports.Controllers
                 return RedirectToAction(nameof(WorkingReports));
             }
 
-            await _reportService.UploadReportAsync(templateId, branchId.Value, userId.Value, file);
+            await _reportService.UploadReportAsync(templateId, (int)branchId, (int)userId, file,(int)deadlineId);
             TempData["Success"] = "Отчет успешно загружен";
 
             return RedirectToAction(nameof(WorkingReports));
@@ -220,7 +216,7 @@ namespace Stat_reports.Controllers
         {
             int? sessionBranchId = HttpContext.Session.GetInt32("BranchId");
 
-            bool isGlobalUser = User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF") || User.IsInRole("Trest");
+            bool isGlobalUser = User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF") || User.IsInRole("AdminTrest");
 
             // Только если не глобальный пользователь — ограничиваем по филиалу
             int? branchId = isGlobalUser ? null : sessionBranchId;
@@ -239,6 +235,8 @@ namespace Stat_reports.Controllers
                 Comment = t.Comment,
                 ReportId = t.ReportId,
                 ReportType = t.ReportType,
+                Period = t.Period, // Добавляем период отчета
+                Type = t.Type, // Добавляем тип дедлайна
                 BranchId = (int)t.BranchId,
                 ReportTypeName = t.ReportType == "Plan" ? "PEB" : "OBUnF",
                 BranchName = branches.FirstOrDefault(b => b.Id == t.BranchId)?.Name ?? "Неизвестный филиал"
@@ -273,7 +271,6 @@ namespace Stat_reports.Controllers
             try
             {
                 var templates = await _reportTemplateService.GetAllReportTemplatesAsync();
-                Console.WriteLine($"Found {templates.Count()} templates");
 
                 var templateList = templates.Select(t => new
                 {
@@ -286,7 +283,6 @@ namespace Stat_reports.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message, "Error in GetTemplatesForManagement");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -373,7 +369,7 @@ namespace Stat_reports.Controllers
             if (result) // Предполагаем, что true означает успех
             {
                 // Возвращаем статус 200 OK с индикатором успеха
-                return Ok(new { success = true, message = "Шаблон успешно удален." });
+                return RedirectToAction(nameof(WorkingReports));
             }
             else
             {
@@ -452,5 +448,187 @@ namespace Stat_reports.Controllers
 
             return View(model);
         }
+
+        /*--------------------------------------------------------------------------------------------------*/
+
+
+        // GET: ReportMvc/EditTemplate/5
+        [HttpGet]
+        [Authorize(Roles = "Admin,PEB,OBUnF,AdminTrest")] // Доступ только тем, кто может управлять шаблонами
+        public async Task<IActionResult> EditTemplate(int id)
+        {
+            var template = await _reportTemplateService.GetReportTemplateByIdAsync(id);
+            if (template == null)
+            {
+                return NotFound($"Шаблон с ID {id} не найден.");
+            }
+
+            var model = new EditTemplateViewModel
+            {
+                Id = template.Id,
+                Name = template.Name,
+                Description = template.Description,
+                Type = template.Type,
+                DeadlineType = template.DeadlineType,
+                CurrentFilePath = template.FilePath,
+                // Получаем разрешенные типы отчетов для текущего пользователя
+                AllowedTypes = GetAllowedReportTypes(),
+            };
+
+            return View(model);
+        }
+
+        // POST: ReportMvc/EditTemplate/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,PEB,OBUnF,AdminTrest")] // Доступ только тем, кто может управлять шаблонами
+        public async Task<IActionResult> EditTemplate(EditTemplateViewModel model)
+        {
+            // Перезаполняем AllowedTypes на случай ошибки валидации
+            model.AllowedTypes = GetAllowedReportTypes();
+
+            // Убираем валидацию для NewFile, если оно не загружено (т.к. оно опционально при редактировании)
+            if (model.NewFile == null)
+            {
+                ModelState.Remove(nameof(model.NewFile));
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            try
+            {
+                var templateToUpdate = await _reportTemplateService.GetReportTemplateByIdAsync(model.Id);
+                if (templateToUpdate == null)
+                {
+                    return NotFound();
+                }
+
+                // Обновляем свойства
+                templateToUpdate.Name = model.Name;
+                templateToUpdate.Description = model.Description;
+                templateToUpdate.Type = model.Type;
+                templateToUpdate.DeadlineType = model.DeadlineType;
+
+                // Обработка файла (только если загружен новый)
+                if (model.NewFile != null && model.NewFile.Length > 0)
+                {
+                    // TODO: Опционально - удалить старый файл _fileService.DeleteFile(templateToUpdate.FilePath);
+                    templateToUpdate.FilePath = await _fileService.SaveFileAsync(model.NewFile,"Templates");
+                }
+
+                // Вызываем метод сервиса для обновления
+                await _reportTemplateService.UpdateReportTemplateAsync(templateToUpdate); // Передаем entity, файл обработали тут
+
+                TempData["SuccessMessage"] = "Шаблон успешно обновлен.";
+                return RedirectToAction(nameof(WorkingReports)); // Перенаправляем на список отчетов в работе или другой список
+            }
+            catch (Exception ex)
+            {
+                // TODO: Залогировать ошибку
+                ModelState.AddModelError("", $"Произошла ошибка при обновлении шаблона: {ex.Message}");
+                return View(model);
+            }
+        }
+
+
+
+        // GET: ReportMvc/EditDeadline/5
+        [HttpGet]
+        [Authorize(Roles = "Admin,PEB,OBUnF,AdminTrest")] // Доступ только тем, кто может управлять дедлайнами
+        public async Task<IActionResult> EditDeadline(int id)
+        {
+            var deadline = await _deadlineService.GetDeadlineByIdAsync(id); // Убедитесь, что сервис включает Branch и Template
+            if (deadline == null)
+            {
+                return NotFound($"Срок сдачи с ID {id} не найден.");
+            }
+
+            var branches = await _branchService.GetAllBranchesDtosAsync();
+            var templates = await _reportTemplateService.GetAllReportTemplatesAsync();
+
+            var model = new EditDeadlineViewModel
+            {
+                Id = deadline.Id,
+                BranchId = deadline.BranchId,
+                ReportTemplateId = deadline.ReportTemplateId,
+                DeadlineDate = deadline.DeadlineDate,
+                Period = deadline.Period,
+                IsClosed = deadline.IsClosed,
+                Branches = new SelectList(branches, "Id", "Name", deadline.BranchId),
+                Templates = new SelectList(templates, "Id", "Name", deadline.ReportTemplateId),
+                BranchName = deadline.Branch?.Name ?? "Неизвестный филиал",
+                TemplateName = deadline.Template?.Name ?? "Неизвестный шаблон"
+            };
+
+            return View(model);
+        }
+
+        // POST: ReportMvc/EditDeadline/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,PEB,OBUnF,AdminTrest")] // Доступ только тем, кто может управлять дедлайнами
+        public async Task<IActionResult> EditDeadline(EditDeadlineViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                // Перезаполняем dropdowns при ошибке
+                var branches = await _branchService.GetAllBranchesDtosAsync();
+                var templates = await _reportTemplateService.GetAllReportTemplatesAsync();
+                model.Branches = new SelectList(branches, "Id", "Name", model.BranchId);
+                model.Templates = new SelectList(templates, "Id", "Name", model.ReportTemplateId);
+                return View(model);
+            }
+
+            try
+            {
+                var deadlineToUpdate = await _deadlineService.GetDeadlineByIdAsync(model.Id);
+                if (deadlineToUpdate == null)
+                {
+                    return NotFound();
+                }
+
+                // Получаем шаблон, чтобы обновить DeadlineType, если шаблон изменился
+                var template = await _reportTemplateService.GetReportTemplateByIdAsync(model.ReportTemplateId);
+                if (template == null)
+                {
+                    ModelState.AddModelError("ReportTemplateId", "Выбранный шаблон не найден.");
+                    // Перезаполняем dropdowns
+                    var branches = await _branchService.GetAllBranchesDtosAsync();
+                    var templates = await _reportTemplateService.GetAllReportTemplatesAsync();
+                    model.Branches = new SelectList(branches, "Id", "Name", model.BranchId);
+                    model.Templates = new SelectList(templates, "Id", "Name", model.ReportTemplateId);
+                    return View(model);
+                }
+
+                // Обновляем свойства
+                deadlineToUpdate.BranchId = model.BranchId;
+                deadlineToUpdate.ReportTemplateId = model.ReportTemplateId;
+                deadlineToUpdate.DeadlineDate = model.DeadlineDate;
+                deadlineToUpdate.Period = model.Period;
+                deadlineToUpdate.IsClosed = model.IsClosed;
+                deadlineToUpdate.DeadlineType = template.DeadlineType; // Обновляем тип из шаблона
+
+                await _deadlineService.UpdateDeadlineAsync(deadlineToUpdate);
+
+                TempData["SuccessMessage"] = "Срок сдачи успешно обновлен.";
+                return RedirectToAction(nameof(WorkingReports));
+            }
+            catch (Exception ex)
+            {
+                // TODO: Залогировать ошибку
+                ModelState.AddModelError("", $"Произошла ошибка при обновлении срока сдачи: {ex.Message}");
+                // Перезаполняем dropdowns при ошибке
+                var branches = await _branchService.GetAllBranchesDtosAsync();
+                var templates = await _reportTemplateService.GetAllReportTemplatesAsync();
+                model.Branches = new SelectList(branches, "Id", "Name", model.BranchId);
+                model.Templates = new SelectList(templates, "Id", "Name", model.ReportTemplateId);
+                return View(model);
+            }
+        }
+
+
     }
 }

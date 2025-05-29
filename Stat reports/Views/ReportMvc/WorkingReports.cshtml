@@ -152,6 +152,7 @@
                                 <thead>
                                     <tr>
                                         <th>Отчет</th>
+                                        <th>Период</th>
                                         <th>Срок сдачи</th>
                                         <th>Статус</th>
                                         <th>Примечание</th>
@@ -165,6 +166,9 @@
                                         @* Добавляем data-атрибуты для JS фильтрации/удаления *@
                                         <tr data-report-type="@item.ReportType" data-deadline-id="@item.DeadlineId">
                                             <td>@item.TemplateName</td>
+                                            <td>
+                                                @PeriodHelper.FormatReportPeriod(item.Period, (DeadlineType)item.Type)
+                                            </td>
                                             <td>@item.Deadline.ToString("dd.MM.yyyy")</td>
                                             <td>
                                                 <span class="badge @(item.Status != null ? ReportStatusHelper.GetCssClass(item.Status) : "bg-secondary")">
@@ -219,7 +223,7 @@
                                                                     <label class="file-input-label btn btn-sm btn-success">
                                                                         Перезагрузить
                                                                     </label>
-                                                                    <input type="file" name="file" class="form-control-file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required onchange="this.form.submit()" />
+                                                                    <input type="file" name="file" class="form-control-file"  required onchange="this.form.submit()" />
 
                                                                 </div>
                                                             </form>
@@ -243,7 +247,7 @@
                                                                     <label class="file-input-label btn btn-sm btn-primary">
                                                                         Загрузить
                                                                     </label>
-                                                                    <input type="file" name="file" class="form-control-file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required onchange="this.form.submit()" />
+                                                                    <input type="file" name="file" class="form-control-file" required onchange="this.form.submit()" />
 
                                                                 </div>
                                                             </form>
@@ -260,6 +264,11 @@
 
                                                     @if (canDeleteThisDeadline)
                                                     {
+                                                        <a href="@Url.Action("EditDeadline", "ReportMvc", new { id = item.DeadlineId })"
+                                                           class="btn btn-sm btn-info me-2" 
+                                                           title="Изменить срок сдачи">
+                                                            ✏️
+                                                        </a>
                                                         @* Используем form для отправки DELETE запроса *@
                                                         <form asp-action="DeleteDeadline" asp-route-id="@item.DeadlineId" method="post" class="d-inline-block">
                                                             @* Рекомендуется добавить токен антиподделки для POST запросов *@
@@ -350,6 +359,7 @@
             canDeleteAccountant: @canDeleteAccountant.ToString().ToLower()
         };
 
+        const editTemplateUrl = '@Url.Action("EditTemplate", "ReportMVC")'; // Adjust "ReportMVC" if your controller name is different
         const templateManagementUrl = '@Url.Action("GetTemplatesForManagement", "ReportMvc")'; // URL для получения шаблонов
         const deleteTemplateUrl = '@Url.Action("DeleteTemplate", "ReportMvc")'; // URL для удаления шаблона (без ID)
 
@@ -534,77 +544,89 @@
             }
 
 
-            // Функция для рендеринга списка шаблонов в модальном окне
-            function renderTemplatesInModal(templates) {
-                templateListContainer.innerHTML = ''; // Очищаем контейнер перед добавлением новых элементов
+    // Функция для рендеринга списка шаблонов в модальном окне
+    function renderTemplatesInModal(templates) {
+        templateListContainer.innerHTML = ''; // Очищаем контейнер перед добавлением новых элементов
 
-                if (!templates || templates.length === 0) {
-                    templateListContainer.innerHTML = '<p class="text-center">Нет доступных шаблонов.</p>';
-                    return;
+        if (!templates || templates.length === 0) {
+            templateListContainer.innerHTML = '<p class="text-center">Нет доступных шаблонов.</p>';
+            return;
+        }
+
+        const listGroup = document.createElement('ul');
+        listGroup.classList.add('list-group'); // Bootstrap класс списка
+
+        templates.forEach(template => {
+            const listItem = document.createElement('li');
+            listItem.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-center'); // Added flex classes for spacing
+            listItem.dataset.templateId = template.id; // Сохраняем ID шаблона в data-атрибуте
+
+            // Текст элемента списка: Название (Тип)
+            const templateText = document.createElement('span');
+            templateText.textContent = `${template.name} (${template.type === 'Plan' ? 'Плановый' : 'Бухгалтерский'})`;
+            listItem.appendChild(templateText);
+
+            // --- Контейнер для кнопок (Edit и Delete) ---
+            const buttonGroup = document.createElement('div');
+            buttonGroup.classList.add('btn-group', 'btn-group-sm'); // Bootstrap group for small buttons
+
+            // --- Кнопка ИЗМЕНИТЬ ШАБЛОН ---
+            // Определяем, имеет ли текущий пользователь право редактировать этот конкретный шаблон
+            // userPermissions определен в секции Scripts Razor View
+            // --- Кнопка УДАЛЕНИЯ ШАБЛОНА ---
+            const canEditThisTemplate = userPermissions.canDeleteAny ||
+                                            (userPermissions.canDeletePlan && template.type === 'Plan') ||
+                                            (userPermissions.canDeleteAccountant && template.type === 'Accountant');
+
+            if (canEditThisTemplate) {
+                const editButton = document.createElement('a'); // Используем <a> для перехода на страницу
+                editButton.classList.add('btn', 'btn-info'); // Bootstrap классы для кнопки "Изменить"
+                editButton.textContent = 'Изменить';
+                editButton.title = 'Изменить шаблон';
+                // Assuming `editTemplateUrl` is defined in your Razor view, similar to `deleteTemplateUrl`
+                editButton.href = `${editTemplateUrl}/${template.id}`; // URL + ID шаблона для редактирования
+                buttonGroup.appendChild(editButton);
+            }
+
+            // --- Кнопка УДАЛЕНИЯ ШАБЛОНА ---
+            const canDeleteThisTemplate = userPermissions.canDeleteAny ||
+                                            (userPermissions.canDeletePlan && template.type === 'Plan') ||
+                                            (userPermissions.canDeleteAccountant && template.type === 'Accountant');
+
+            if (canDeleteThisTemplate) {
+                const deleteButtonForm = document.createElement('form');
+                deleteButtonForm.classList.add('d-inline-block', 'ms-2'); // Add margin-left for spacing
+                deleteButtonForm.method = 'post';
+                deleteButtonForm.action = `${deleteTemplateUrl}/${template.id}`;
+
+                const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]');
+                if (antiForgeryToken) {
+                    const tokenInput = document.createElement('input');
+                    tokenInput.type = 'hidden';
+                    tokenInput.name = '__RequestVerificationToken';
+                    tokenInput.value = antiForgeryToken.value;
+                    deleteButtonForm.appendChild(tokenInput);
                 }
 
-                const listGroup = document.createElement('ul');
-                listGroup.classList.add('list-group'); // Bootstrap класс списка
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'submit';
+                deleteButton.classList.add('btn', 'btn-danger');
+                deleteButton.textContent = 'Удалить';
+                deleteButton.title = 'Удалить шаблон';
+                deleteButton.onclick = function () {
+                    return confirm('Вы уверены, что хотите удалить этот шаблон отчета? Это также может повлиять на связанные сроки сдачи.');
+                };
 
-                templates.forEach(template => {
-                    const listItem = document.createElement('li');
-                    listItem.classList.add('list-group-item'); // Bootstrap класс элемента списка
-                    listItem.dataset.templateId = template.id; // Сохраняем ID шаблона в data-атрибуте
-
-                    // Текст элемента списка: Название (Тип)
-                    const templateText = document.createElement('span');
-                    templateText.textContent = `${template.name} (${template.type === 'Plan' ? 'Плановый' : 'Бухгалтерский'})`;
-                    listItem.appendChild(templateText);
-
-                    // --- Кнопка УДАЛЕНИЯ ШАБЛОНА ---
-                    const deleteButtonContainer = document.createElement('div'); // Контейнер для кнопки
-
-                    // Определяем, имеет ли текущий пользователь право удалить этот конкретный шаблон
-                    // userPermissions определен в секции Scripts Razor View
-                    const canDeleteThisTemplate = userPermissions.canDeleteAny ||
-                        (userPermissions.canDeletePlan && template.type === 'Plan') ||
-                        (userPermissions.canDeleteAccountant && template.type === 'Accountant');
-
-                    if (canDeleteThisTemplate) {
-                        const deleteButtonForm = document.createElement('form');
-                        deleteButtonForm.classList.add('d-inline-block');
-                        // Важно: используем POST метод для удаления
-                        deleteButtonForm.method = 'post';
-                        deleteButtonForm.action = `${deleteTemplateUrl}/${template.id}`; // URL + ID шаблона
-
-                        // Добавляем токен антиподделки (нужно получить его из Razor View и передать в JS)
-                        // Более надежно - получить токен со страницы и добавить в форму
-                        const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]');
-                        if (antiForgeryToken) {
-                            const tokenInput = document.createElement('input');
-                            tokenInput.type = 'hidden';
-                            tokenInput.name = '__RequestVerificationToken';
-                            tokenInput.value = antiForgeryToken.value;
-                            deleteButtonForm.appendChild(tokenInput);
-                        }
-
-
-                        const deleteButton = document.createElement('button');
-                        deleteButton.type = 'submit'; // Кнопка отправляет форму
-                        deleteButton.classList.add('btn', 'btn-sm', 'btn-danger'); // Bootstrap классы
-                        deleteButton.textContent = 'Удалить';
-                        deleteButton.title = 'Удалить шаблон';
-
-                        // Добавляем подтверждение перед отправкой
-                        deleteButton.onclick = function () {
-                            return confirm('Вы уверены, что хотите удалить этот шаблон отчета? Это также может повлиять на связанные сроки сдачи.');
-                        };
-
-                        deleteButtonForm.appendChild(deleteButton);
-                        deleteButtonContainer.appendChild(deleteButtonForm);
-                        listItem.appendChild(deleteButtonContainer);
-                    }
-
-                    listGroup.appendChild(listItem);
-                });
-
-                templateListContainer.appendChild(listGroup);
+                deleteButtonForm.appendChild(deleteButton);
+                buttonGroup.appendChild(deleteButtonForm);
             }
+
+            listItem.appendChild(buttonGroup); // Добавляем группу кнопок к элементу списка
+            listGroup.appendChild(listItem);
+        });
+
+        templateListContainer.appendChild(listGroup);
+    }
 
 
             // --- Инициализация при загрузке ---

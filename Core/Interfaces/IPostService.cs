@@ -12,5 +12,6 @@ namespace Core.Interfaces
     {
         Task<List<Post>> GetRecentPostsForUserAsync();
         Task<Post> AddPostAsync(string header, string text, int posterId);
+        Task DeletePostAsync(int postId);
     }
 }
