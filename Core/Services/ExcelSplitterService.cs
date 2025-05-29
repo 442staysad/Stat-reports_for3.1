@@ -118,15 +118,15 @@ namespace Core.Services
                 return quarter switch
                 {
                     1 => $"январь-март {year}",
-                    2 => $"апрель-июнь {year}",
-                    3 => $"июль-сентябрь {year}",
-                    4 => $"октябрь-декабрь {year}",
+                    2 => $"январь-июнь {year}",
+                    3 => $"январь-сентябрь {year}",
+                    4 => $"январь-декабрь {year}",
                     _ => $"квартал {quarter} {year}"
                 };
             }
             else if (halfYear != null)
             {
-                return halfYear == 1 ? $"январь-июнь {year}" : $"июль-декабрь {year}";
+                return halfYear == 1 ? $"январь-июнь {year}" : $"январь-декабрь {year}";
             }
 
             return $"{year} год";

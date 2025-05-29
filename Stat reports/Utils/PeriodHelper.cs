@@ -53,7 +53,7 @@ namespace Stat_reports.Utils // Или ваше основное простра�
                     return $"{quarterStr} {year} г. " ;
 
                 case DeadlineType.HalfYearly:
-                    string halfYearStr = (month >= 1 && month <= 6) ? "Январь-Июнь" : "Июль-Декабрь";
+                    string halfYearStr = (month >= 1 && month <= 6) ? "Январь-Июнь" : "Январь-Декабрь";
                     return $"{halfYearStr} {year} г.";
 
                 case DeadlineType.Yearly:
