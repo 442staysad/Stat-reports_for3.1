@@ -49,7 +49,7 @@ namespace Stat_reports.Utils // Или ваше основное простра�
                     // Форматируем с заглавной буквы
                     startMonthName = char.ToUpper(startMonthName[0], RussianCulture) + startMonthName.Substring(1);
                     endMonthName = char.ToUpper(endMonthName[0], RussianCulture) + endMonthName.Substring(1);
-                    quarterStr = $"{startMonthName}-{endMonthName}";
+                    quarterStr = $"Январь-{endMonthName}";
                     return $"{quarterStr} {year} г. " ;
 
                 case DeadlineType.HalfYearly:

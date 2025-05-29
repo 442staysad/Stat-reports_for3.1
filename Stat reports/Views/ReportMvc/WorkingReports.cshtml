@@ -141,7 +141,9 @@
             @for (int i = 0; i < visibleBranches.Count; i++)
             {
                 var branch = visibleBranches[i];
-                var branchReports = Model.Where(m => m.BranchId == branch.BranchId).ToList();
+                var branchReports = Model
+        .Where(m => m.BranchId == branch.BranchId &&
+               ( m.Status != ReportStatus.Reviewed)).ToList();
                 var branchActive = i == 0 ? "show active" : "";
 
                 <div class="tab-pane fade @branchActive" id="branch-@branch.BranchId" role="tabpanel">
