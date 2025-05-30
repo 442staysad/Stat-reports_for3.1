@@ -45,8 +45,12 @@ namespace Stat_reports
             services.AddScoped<IRoleService, RoleService>();
             services.AddScoped<ICommentService, CommentService>();
             services.AddScoped<IPostService, PostService>();
-
-            services.AddHostedService<DeadlineNotificationHostedService>();
+            // Conditionally add Hosted Service
+            var enableDeadlineNotification = Configuration.GetValue<bool>("HostedServices:EnableDeadlineNotification");
+            if (enableDeadlineNotification)
+            {
+                services.AddHostedService<DeadlineNotificationHostedService>();
+            }
 
             services.AddSingleton<AdminAuthFilter>();
             services.AddSingleton<AuthorizeBranchAndUserAttribute>();

@@ -70,12 +70,14 @@ namespace Core.Services
                     foreach (var cell in row.CellsUsed().Skip(2)) // Пропускаем первые два столбца (код, ед. измерения)
                     {
                         // Пробуем распарсить значение ячейки как число
-                        if (double.TryParse(cell.GetValue<string>().Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out double sourceValue))
+                        if (double.TryParse(cell.GetValue<string>().Replace(",", ".").Replace("\u00A0", "")
+                                    .Replace(" ", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out double sourceValue))
                         {
                             var targetCell = targetWorksheet.Cell(cell.Address);
 
                             // Проверяем, является ли целевая ячейка числом (иначе там может быть текст)
-                            if (double.TryParse(targetCell.GetValue<string>().Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out double targetValue))
+                            if (double.TryParse(targetCell.GetValue<string>().Replace(",", ".").Replace("\u00A0", "")
+                                    .Replace(" ", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out double targetValue))
                             {
                                 targetCell.Value = targetValue + sourceValue; // Суммируем
                             }

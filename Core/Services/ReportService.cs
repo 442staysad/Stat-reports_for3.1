@@ -129,33 +129,33 @@ namespace Core.Services
             var existingReport = await _unitOfWork.Reports.FindAsync(r =>
                 r.Id==deadline.ReportId);
 
-            var filePath = await _fileService.SaveFileAsync(file, "Reports", branch.Name, DateTime.Now.Year, template.Name);
 
-            if (existingReport != null)
-            {
+            if(existingReport != null)
+{
                 if (!string.IsNullOrEmpty(existingReport.FilePath))
-                    await _fileService.DeleteFileAsync(existingReport.FilePath);
+                    await _fileService.DeleteFileAsync(existingReport.FilePath); // <-- 1. Удаляем старый файл
+
+                var filePath1 = await _fileService.SaveFileAsync(file, "Reports", branch.Name, DateTime.Now.Year, template.Name); // <-- 2. Сохраняем новый файл (ЭТО НУЖНО СДЕЛАТЬ ЗДЕСЬ)
 
                 existingReport.Name = Path.GetFileNameWithoutExtension(file.FileName);
-                existingReport.FilePath = filePath;
+                existingReport.FilePath = filePath1; // <-- 3. Обновляем путь к файлу в базе данных
                 existingReport.UploadedById = uploadedById;
                 existingReport.UploadDate = DateTime.UtcNow;
                 existingReport.Period = deadline.Period;
 
-                await _unitOfWork.Reports.UpdateAsync(existingReport);
+                await _unitOfWork.Reports.UpdateAsync(existingReport); // <-- 4. Обновляем запись отчета в БД
 
                 deadline.Status = ReportStatus.Draft;
                 deadline.ReportId = existingReport.Id;
                 await _unitOfWork.SubmissionDeadlines.UpdateAsync(deadline);
 
-                
-
                 return MapToDto(existingReport);
             }
 
+            var filePath = await _fileService.SaveFileAsync(file, "Reports", branch.Name, DateTime.Now.Year, template.Name);
             var newReport = new Report
             {
-                Name = file.FileName,
+                Name = Path.GetFileNameWithoutExtension(file.FileName),
                 TemplateId = templateId,
                 BranchId = branchId,
                 UploadedById = uploadedById,
