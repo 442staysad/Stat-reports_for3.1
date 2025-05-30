@@ -192,7 +192,7 @@
                         @foreach (var comment in Model.CommentHistory.OrderByDescending(c => c.CreatedAt))
                         {
                             <li class="list-group-item">
-                                <strong>@comment.AuthorName</strong>
+                                <strong>@comment.AuthorFullName</strong>
                                 <small class="text-muted">@comment.CreatedAt.ToString("g")</small>
                                 <p class="mb-0">@comment.Comment</p>
                             </li>

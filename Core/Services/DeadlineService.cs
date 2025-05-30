@@ -140,13 +140,21 @@ namespace Core.Services
         public async Task<bool> DeleteDeadlineAsync(int id)
         {
             var deadline = await _unitOfWork.SubmissionDeadlines.FindAsync(r => r.Id == id);
-            var report = await _unitOfWork.Reports.FindAsync(r => r.Id== deadline.ReportId);
-            if (deadline== null) return false;
+            if (deadline == null)
+                return false;
+
+            var report = await _unitOfWork.Reports.FindAsync(r => r.Id == deadline.ReportId);
+
             await _unitOfWork.SubmissionDeadlines.DeleteAsync(deadline);
-            if (report!=null)
-            await _fileService.DeleteFileAsync(report.FilePath);
+
+            if (report != null && !string.IsNullOrWhiteSpace(report.FilePath))
+            {
+                await _fileService.DeleteFileAsync(report.FilePath);
+            }
+
             return true;
         }
+
 
         /*
         private DateTime CalculateNextDeadline(SubmissionDeadline deadline)

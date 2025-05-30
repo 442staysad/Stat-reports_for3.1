@@ -66,12 +66,16 @@ using System.Collections.Generic;
                 .HasForeignKey(r => r.UploadedById)
                 .OnDelete(DeleteBehavior.Restrict);
 
-
-            /*  modelBuilder.Entity<SubmissionDeadline>()
-                  .HasOne(sd => sd.Template)
-                  .WithOne(rt => rt.SubmissionDeadline) // Указываем связь
-                  .HasForeignKey<SubmissionDeadline>(sd => sd.ReportTemplateId)
-                  .OnDelete(DeleteBehavior.Cascade);*/
+            modelBuilder.Entity<CommentHistory>()
+                .HasOne(c => c.Deadline)
+                .WithMany(d => d.CommentHistory)
+                .HasForeignKey(c => c.DeadlineId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<SubmissionDeadline>()
+                .HasOne<Report>()
+                .WithOne()
+                .HasForeignKey<SubmissionDeadline>(d => d.ReportId)
+                .OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<ReportTemplate>()
                 .HasMany(rt => rt.Deadlines)
                 .WithOne(d => d.Template)

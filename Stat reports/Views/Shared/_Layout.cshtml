@@ -66,7 +66,7 @@
                                 🔔 Уведомления
                                 @if (unreadCount > 0)
                                 {
-                                    <span class="position-absolute top-10 start-100 translate-middle badge rounded-pill bg-danger">
+                                    <span id="notificationBadge" class="position-absolute top-10 start-100 translate-middle badge rounded-pill bg-danger">
                                         @unreadCount
                                     </span>
                                 }
@@ -130,7 +130,8 @@
     </footer>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script> @* Этот файл включает Popper.js для Bootstrap 4/5 *@
-    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/5.0.8/signalr.min.js"></script>
+    <script src="~/js/site.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

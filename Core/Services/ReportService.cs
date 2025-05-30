@@ -52,13 +52,17 @@ namespace Core.Services
 
             var reportDto = MapToDto(report);
 
-            var comments = await _unitOfWork.CommentHistory.FindAllAsync(c => c.ReportId == id);
+            var comments = await _unitOfWork.CommentHistory
+                .FindAll(query => query.Where(c => c.ReportId == id).Include(c => c.Author))
+                .ToListAsync();
 
             reportDto.CommentHistory = comments.Select(c => new CommentHistoryDto
             {
                 Comment = c.Comment,
                 CreatedAt = c.CreatedAt,
-                AuthorName = c.Author != null ? $"{c.Author.FullName}" : "Неизвестный автор"
+                AuthorFullName = c.Author != null ? $"{c.Author.FullName}" : "Неизвестный автор",
+                Id = c.Id, // Если нужен ID записи истории
+                DeadlineId = c.DeadlineId ?? 0 // Используем ?? для избежания null
 
             }).ToList();
 
@@ -132,7 +136,7 @@ namespace Core.Services
                 if (!string.IsNullOrEmpty(existingReport.FilePath))
                     await _fileService.DeleteFileAsync(existingReport.FilePath);
 
-                existingReport.Name = file.FileName;
+                existingReport.Name = Path.GetFileNameWithoutExtension(file.FileName);
                 existingReport.FilePath = filePath;
                 existingReport.UploadedById = uploadedById;
                 existingReport.UploadDate = DateTime.UtcNow;
@@ -252,12 +256,12 @@ namespace Core.Services
                     ReportId = deadline.ReportId,
                     AuthorId = authorId
                 };
-
+                var author = await _unitOfWork.Users.FindAsync(u => u.Id == authorId);
                 await _unitOfWork.CommentHistory.AddAsync(commentHistory);
 
                 await _notificationService.AddNotificationAsync(
                     (int)report.UploadedById,
-                    $"{report.Name}: {comment}");
+                    $"{author.FullName}:  {report.Name}: {comment}");
 
                 await _unitOfWork.SubmissionDeadlines.UpdateAsync(deadline);
                 await transaction.CommitAsync();
@@ -285,7 +289,8 @@ namespace Core.Services
             var query = _unitOfWork.SubmissionDeadlines
                 .GetAll(q => q
                     .Include(t => t.Template)
-                    .Include(d => d.CommentHistory)); // Подгружаем историю комментариев
+                    .Include(d => d.CommentHistory) // Подгружаем историю комментариев
+                        .ThenInclude(ch => ch.Author)); // <-- ДОБАВЛЕНО: Подгружаем автора для каждого CommentHistory
 
             if (branchId.HasValue)
                 query = query.Where(d => d.BranchId == branchId.Value && !d.IsClosed);
@@ -310,7 +315,10 @@ namespace Core.Services
                     .Select(c => new CommentHistoryDto
                     {
                         CreatedAt = c.CreatedAt,
-                        Comment = c.Comment
+                        Comment = c.Comment,
+                        AuthorFullName = c.Author != null ? c.Author.FullName : "Неизвестный автор",
+                        DeadlineId = (int)c.DeadlineId,
+                        Id = c.Id // Если нужен ID записи истории
                     })
                     .ToList() ?? new List<CommentHistoryDto>() // защита от null
             }).ToList();
@@ -327,7 +335,7 @@ namespace Core.Services
             ReportType? reportType)
         {
             // Включаем Template, т.к. нужен DeadlineType
-            var query = _unitOfWork.Reports.GetAll(includes: r => r.Include(d => d.Branch).Include(d => d.Template));
+            var query = _unitOfWork.Reports.GetAll(includes: r => r.Include(d => d.Branch).Include(d => d.Template).Include(u=>u.UploadedBy));
 
             // Фильтруем только закрытые отчеты для архива
             query = query.Where(rp => rp.IsClosed);
@@ -351,21 +359,22 @@ namespace Core.Services
                 // Если шаблон найден и указан год
                 if (selectedTemplate != null && year.HasValue)
                 {
+                    calculatedStartDate = new DateTime(year.Value, 1, 1);
+                    calculatedEndDate = new DateTime(year.Value, 12, 31);
+
                     try
                     {
                         switch (selectedTemplate.DeadlineType)
                         {
-                            case DeadlineType.Yearly:
-                                calculatedStartDate = new DateTime(year.Value, 1, 1);
-                                calculatedEndDate = new DateTime(year.Value, 12, 31);
-                                break;
                             case DeadlineType.Monthly:
                                 if (month.HasValue && month.Value >= 1 && month.Value <= 12)
                                 {
                                     calculatedStartDate = new DateTime(year.Value, month.Value, 1);
                                     calculatedEndDate = new DateTime(year.Value, month.Value, DateTime.DaysInMonth(year.Value, month.Value));
                                 }
+                                // Если month невалиден, останутся значения по умолчанию (годовой период)
                                 break;
+
                             case DeadlineType.Quarterly:
                                 if (quarter.HasValue && quarter.Value >= 1 && quarter.Value <= 4)
                                 {
@@ -374,7 +383,9 @@ namespace Core.Services
                                     int endMonth = startMonth + 2;
                                     calculatedEndDate = new DateTime(year.Value, endMonth, DateTime.DaysInMonth(year.Value, endMonth));
                                 }
+                                // Если quarter невалиден, останутся значения по умолчанию (годовой период)
                                 break;
+
                             case DeadlineType.HalfYearly:
                                 if (halfYearPeriod.HasValue && halfYearPeriod.Value >= 1 && halfYearPeriod.Value <= 2)
                                 {
@@ -383,12 +394,16 @@ namespace Core.Services
                                     int endMonth = halfYearPeriod.Value == 1 ? 6 : 12;
                                     calculatedEndDate = new DateTime(year.Value, endMonth, DateTime.DaysInMonth(year.Value, endMonth));
                                 }
+                                // Если halfYearPeriod невалиден, останутся значения по умолчанию (годовой период)
                                 break;
-                            // Если есть другие DeadlineType, добавьте их здесь
+
+                            case DeadlineType.Yearly:
+                                // Для Yearly значения уже установлены по умолчанию, ничего не делаем.
+                                break;
+
                             default:
-                                // Если тип периода шаблона не Yearly, Monthly, Quarterly или HalfYearly,
-                                // или не предоставлены нужные параметры (например, месяц для Monthly),
-                                // calculatedStartDate и calculatedEndDate останутся null, и фильтр по дате не применится.
+                                // Если есть другие DeadlineType, которые также должны иметь годовой период по умолчанию
+                                // или требуют другой логики, добавьте их здесь.
                                 break;
                         }
                     }
@@ -434,6 +449,8 @@ namespace Core.Services
                 FilePath = r.FilePath,
                 Period = r.Period,
                 Type = r.Type,
+                UploadDate = r.UploadDate,
+                UploadedByName = r.UploadedBy?.FullName, // Добавляем имя пользователя, если нужно
                 // Используем DeadlineType из связанного шаблона
                 DeadlineType = r.Template?.DeadlineType ?? 0
             }).ToList();

@@ -50,7 +50,7 @@ namespace Stat_reports
 
             services.AddSingleton<AdminAuthFilter>();
             services.AddSingleton<AuthorizeBranchAndUserAttribute>();
-
+            services.AddSignalR();
             services.AddHttpContextAccessor();
             services.AddDistributedMemoryCache();
             services.AddSession(options =>
@@ -108,6 +108,7 @@ namespace Stat_reports
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller=ReportMvc}/{action=WorkingReports}/{id?}");
+                endpoints.MapHub<NotificationHub>("/notificationHub");
             });
         }
     }

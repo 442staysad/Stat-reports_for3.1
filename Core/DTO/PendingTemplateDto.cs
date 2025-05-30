@@ -27,8 +27,11 @@ namespace Core.DTO
 
     public class CommentHistoryDto
     {
-        public DateTime CreatedAt { get; set; }
+        public int Id { get; set; } // Если нужен ID записи истории
+        public int DeadlineId { get; set; }
         public string Comment { get; set; }
-        public string? AuthorName { get; set; }
+        public ReportStatus Status { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string AuthorFullName { get; set; } // Добавлено для имени автора
     }
 }

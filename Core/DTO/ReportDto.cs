@@ -10,6 +10,7 @@ namespace Core.DTO
         public string Name { get; set; }
         public DateTime SubmissionDate { get; set; }
         public int UploadedById { get; set; }
+        public string? UploadedByName { get; set; }
         public int? BranchId { get; set; }
         public int? TemplateId { get; set; }
         public DeadlineType? DeadlineType { get; set; }
