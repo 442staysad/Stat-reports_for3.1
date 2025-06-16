@@ -15,7 +15,7 @@ namespace Core.Interfaces
         Task<ReportDto> GetReportByIdAsync(int id);
         Task<ReportDto> CreateReportAsync(ReportDto reportDto);
         Task<ReportDto> UpdateReportAsync(int id, ReportDto reportDto);
-        Task<ReportDto> ReopenReportAsync(int reportid);
+        Task ReopenReportAsync(int reportid);
         Task<bool> DeleteReportAsync(int id);
         Task<IEnumerable<Report>> GetReportsByBranchAsync(int branchId);
         Task<ReportDto> UploadReportAsync(int templateId, int branchId, int uploadedById, IFormFile file,int deadlinId);

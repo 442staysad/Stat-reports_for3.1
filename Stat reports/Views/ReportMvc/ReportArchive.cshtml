@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Архив отчетов";
     bool allowed = User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF")||User.IsInRole("AdminTrest");
+    string currentUserRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value; // Получаем роль текущего пользователя
 }
 @section Styles {
 <link rel="stylesheet" href="~/css/archive.css" />
@@ -43,7 +44,7 @@
                 }
             </select>
         </div>
-        @if (User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF"))
+        @if (User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF") || User.IsInRole("AdminTrest"))
         {
             <div class="col-md-3">
                 <label for="branchId" class="form-label">Филиал</label>
@@ -192,9 +193,9 @@
                                 @* Добавлены отступы справа и снизу *@
                                 ⬇ Скачать
                             </a>
-                            @if (allowed)
+                            @if ((report.Type == ReportType.Accountant && User.IsInRole("OBUnF")) || (report.Type == ReportType.Plan && User.IsInRole("PEB")) || User.IsInRole("Admin") || User.IsInRole("AdminTrest"))
                             {
-                                <form method="post" asp-action="ReopenReport" asp-route-reportId="@report.Id" class="d-inline">
+                                <form asp-action="ReopenReport" asp-route-reportId="@report.Id" class="d-inline" method="post">
                                     <button type="submit" class="btn btn-sm btn-warning mb-2">
                                         @* Добавлен отступ снизу *@
                                         🔓 Открыть

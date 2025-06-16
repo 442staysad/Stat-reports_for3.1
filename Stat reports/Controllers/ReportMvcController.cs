@@ -233,13 +233,15 @@ namespace Stat_reports.Controllers
                 Deadline = t.Deadline,
                 Status = t.Status,
                 Comment = t.Comment,
+                CommentId = t.CommentId, // Добавляем идентификатор комментария
+                LatestCommentAuthorId = t.CommentAuthorId, // Получаем ID последнего автора комментария
                 ReportId = t.ReportId,
                 ReportType = t.ReportType,
                 Period = t.Period, // Добавляем период отчета
                 Type = t.Type, // Добавляем тип дедлайна
                 BranchId = (int)t.BranchId,
                 ReportTypeName = t.ReportType == "Plan" ? "PEB" : "OBUnF",
-                BranchName = branches.FirstOrDefault(b => b.Id == t.BranchId)?.Name ?? "Неизвестный филиал"
+                BranchName = branches.FirstOrDefault(b => b.Id == t.BranchId)?.Shortname?? "Неизвестный филиал"
             }).ToList();
 
             return View(viewModel);
@@ -384,6 +386,7 @@ namespace Stat_reports.Controllers
         [Authorize(Roles = "Admin,PEB,OBUnF,AdminTrest")]
         public async Task<IActionResult> ReopenReport(int reportId)
         {
+            Console.WriteLine(reportId);
             await _reportService.ReopenReportAsync(reportId);
             return RedirectToAction(nameof(ReportArchive));
         }
@@ -406,18 +409,10 @@ namespace Stat_reports.Controllers
         {
             int? sessionBranchId = HttpContext.Session.GetInt32("BranchId");
 
-            if (User.IsInRole("User"))
+            if (User.IsInRole("User")||User.IsInRole("AdminBranch"))
             {
                 // Если пользователь с ролью User, принудительно устанавливаем его филиал
                 branchId = sessionBranchId;
-            }
-            else if (!User.IsInRole("Admin") && !User.IsInRole("PEB") && !User.IsInRole("OBUnF"))
-            {
-                // Если пользователь не админ, PEB или OBUnF, и не User с установленным филиалом,
-                // возможно, вы захотите перенаправить его или показать сообщение.
-                // Или просто не применять фильтр по филиалу, если он не установлен.
-                // В данном случае, если branchId пришел null (например, из сброса фильтров)
-                // и пользователь не User, фильтр по филиалу не применяется.
             }
 
 
@@ -629,6 +624,49 @@ namespace Stat_reports.Controllers
             }
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken] // Защита от CSRF
+        public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentRequest model)
+        {
+            if (model == null || string.IsNullOrWhiteSpace(model.CommentText))
+            {
+                return BadRequest(new { success = false, message = "Текст комментария не может быть пустым." });
+            }
 
+            try
+            {
+                // Получаем ID текущего пользователя
+                var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                // Вызываем сервис для обновления комментария
+                // Этот метод в сервисе должен проверить, что currentUserId совпадает с автором комментария
+                var updatedComment = await _deadlineService.UpdateCommentAsync(model.CommentId, model.CommentText, currentUserId);
+
+                if (updatedComment == null)
+                {
+                    // Сервис вернул null, значит, у пользователя нет прав или комментарий не найден
+                    return Forbid(); // Или NotFound()
+                }
+
+                // Возвращаем успешный JSON-ответ
+                return Json(new { success = true, newText = updatedComment.Comment });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid(); // Пользователь не является автором
+            }
+            catch (Exception ex)
+            {
+                // TODO: Залогировать ошибку
+                return StatusCode(500, new { success = false, message = "Внутренняя ошибка сервера при обновлении комментария." });
+            }
+        }
+
+        // Вспомогательный класс для приема данных от AJAX запроса
+        public class UpdateCommentRequest
+        {
+            public int CommentId { get; set; }
+            public string CommentText { get; set; }
+        }
     }
 }

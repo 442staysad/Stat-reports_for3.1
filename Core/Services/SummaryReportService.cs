@@ -26,7 +26,7 @@ namespace Core.Services
         {
             var reports = await _unitOfWork.Reports.FindAllAsync(r =>
                 r.TemplateId == templateId &&
-                r.UploadDate.Year == year &&
+                r.Period.Year == year &&
                 branchIds.Contains((int)r.BranchId));
 
             if (month != null)

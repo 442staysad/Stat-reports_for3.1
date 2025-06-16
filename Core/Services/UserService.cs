@@ -27,7 +27,7 @@ namespace Core.Services
         }
         public async Task<IEnumerable<UserDto>> GetAllUsersAsync(int? branchId = null)
         {
-            var query = (await _unitOfWork.Users.GetAll(u=>u.Include(r=>r.Role)).ToListAsync())
+            var query = (await _unitOfWork.Users.GetAll(u=>u.Include(r=>r.Role).Include(b=>b.Branch)).ToListAsync())
                         .Where(u => !branchId.HasValue || u.BranchId == branchId);
             return query.Select(u => new UserDto
             {
@@ -42,6 +42,7 @@ namespace Core.Services
                 BranchId = u.BranchId!.Value,
                 Password = "",
                 RoleNameRu = u.Role?.RoleNameRu,
+                BranchName = u.Branch?.Shortname
             });
         }
 

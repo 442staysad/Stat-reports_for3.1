@@ -6,15 +6,45 @@
 
 @section Styles {
     <style>
+
         .user-table {
+                table-layout: fixed;
+                width: 100%;
             background: rgba(255, 255, 255, 0.15);
             color: white;
             border-radius: 10px;
         }
 
-            .user-table th, .user-table td {
-                padding: 10px;
-                border-bottom: 1px solid rgba(255,255,255,0.2);
+            .user-table th:nth-child(1), .user-table td:nth-child(1) {
+                width: 20%;
+            }
+
+            .user-table th:nth-child(2), .user-table td:nth-child(2) {
+                width: 20%;
+            }
+
+            .user-table th:nth-child(3), .user-table td:nth-child(3) {
+                width: 15%;
+            }
+
+            .user-table th:nth-child(4), .user-table td:nth-child(4) {
+                width: 25%;
+            }
+
+            .user-table th:nth-child(5), .user-table td:nth-child(5) {
+                width: 10%;
+            }
+
+            .user-table th:nth-child(6), .user-table td:nth-child(6) {
+                width: 10%;
+            }
+
+            .user-table td, .user-table th {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                word-wrap: break-word;
+                white-space: normal; 
+                overflow-wrap: break-word;
             }
 
         .btn-add {
@@ -70,10 +100,10 @@
     <table class="table user-table" id="userTable">
         <thead>
             <tr>
-                <th>Имя</th>
                 <th>ФИО</th>
+                <th>Филиал</th>
                 <th>Роль</th>
-                <th>Телефон</th>
+                <th>Телефон/Почта</th>
                 <th>Онлайн</th>
                 <th></th>
             </tr>
@@ -84,10 +114,10 @@
                 @if (user.RoleName != "Admin")
                 {
                     <tr>
-                        <td>@user.UserName</td>
                         <td>@user.FullName</td>
+                        <td>@user.BranchName</td>
                         <td>@user.RoleNameRu</td>
-                        <td>@user.Number</td>
+                        <td>@user.Number / @user.Email</td>
                         <td><span class="badge bg-secondary">⏳ offline</span></td>
                         <td>
                             @if (User.IsInRole("Admin") || User.IsInRole("AdminTrest") || User.IsInRole("AdminBranch"))

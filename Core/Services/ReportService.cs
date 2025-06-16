@@ -163,7 +163,8 @@ namespace Core.Services
                 UploadDate = DateTime.UtcNow,
                 Period = deadline.Period,
                 Branch = branch,
-                Template = template
+                Template = template,
+                Type=template.Type
             };
 
             var createdReport = await _unitOfWork.Reports.AddAsync(newReport);
@@ -306,6 +307,10 @@ namespace Core.Services
                 ReportId = d.ReportId,
                 Status = (ReportStatus)d.Status,
                 Comment = d.Comment,
+                CommentId = d.CommentHistory?.OrderByDescending(h => h.CreatedAt)
+                                               .FirstOrDefault()?.Id, // Используем первый комментарий, если есть
+                CommentAuthorId = d.CommentHistory?.OrderByDescending(h => h.CreatedAt)
+                                               .FirstOrDefault()?.AuthorId, // Идентификатор автора последнего комментария
                 ReportType = d.Template?.Type.ToString(),
                 Period = d.Period,
                 Type = (DeadlineType)(d.Template?.DeadlineType),// Используем DeadlineType из шаблона
@@ -317,6 +322,7 @@ namespace Core.Services
                         CreatedAt = c.CreatedAt,
                         Comment = c.Comment,
                         AuthorFullName = c.Author != null ? c.Author.FullName : "Неизвестный автор",
+                        AuthorId = c.AuthorId, // Добавлено для идентификатора автора
                         DeadlineId = (int)c.DeadlineId,
                         Id = c.Id // Если нужен ID записи истории
                     })
@@ -456,11 +462,11 @@ namespace Core.Services
             }).ToList();
         }
 
-        public async Task<ReportDto> ReopenReportAsync(int reportid)
+        public async Task ReopenReportAsync(int reportid)
         {
             var report = await _unitOfWork.Reports.FindAsync(r => r.Id == reportid);
             var deadline = await _unitOfWork.SubmissionDeadlines.FindAsync(d => d.ReportId == reportid);
-            if (report == null|| deadline==null) return null;
+            
             report.IsClosed = false;
             deadline.IsClosed = false;
             deadline.Status = ReportStatus.NeedsCorrection;
@@ -468,7 +474,7 @@ namespace Core.Services
             await _unitOfWork.Reports.UpdateAsync(report);
             await _unitOfWork.SubmissionDeadlines.UpdateAsync(deadline);
             await _unitOfWork.SaveChangesAsync();
-            return MapToDto(report);
+     
         }
 
         private ReportDto MapToDto(Report report)

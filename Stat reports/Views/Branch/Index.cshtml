@@ -12,9 +12,32 @@
             border-radius: 10px;
         }
 
+            .branch-table th:nth-child(1), .branch-table td:nth-child(1) {
+                width: 25%;
+            }
+
+            .branch-table th:nth-child(2), .branch-table td:nth-child(2) {
+                width: 15%;
+            }
+
+            .branch-table th:nth-child(3), .branch-table td:nth-child(3) {
+                width: 20%;
+            }
+
+            .branch-table th:nth-child(4), .branch-table td:nth-child(4) {
+                width: 30%;
+            }
+
+            .branch-table th:nth-child(5), .branch-table td:nth-child(5) {
+                width: 10%;
+            }
             .branch-table th, .branch-table td {
                 padding: 10px;
                 border-bottom: 1px solid rgba(255,255,255,0.2);
+                word-wrap: break-word;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: normal;
             }
 
         .btn-add {

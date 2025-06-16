@@ -16,6 +16,7 @@ namespace Core.DTO
         public DateTime Period { get; set; } // Период отчета, если есть
         public ReportStatus Status { get; set; }
         public string? Comment { get; set; }
+        public int? CommentId { get; set; } // Идентификатор комментария, если есть
         public int? ReportId { get; set; } // ID загруженного отчета (если есть)
         public string ReportType { get; set; }
         public DeadlineType Type { get; set; } // Тип дедлайна (ежемесячный, квартальный и т.д.)
@@ -23,6 +24,7 @@ namespace Core.DTO
 
         // Новое поле: история комментариев
         public List<CommentHistoryDto> CommentHistory { get; set; } = new List<CommentHistoryDto>();
+        public int? CommentAuthorId { get; internal set; }
     }
 
     public class CommentHistoryDto
@@ -33,5 +35,6 @@ namespace Core.DTO
         public ReportStatus Status { get; set; }
         public DateTime CreatedAt { get; set; }
         public string AuthorFullName { get; set; } // Добавлено для имени автора
+        public int? AuthorId { get; set; } // Идентификатор автора комментария, если нужен
     }
 }
