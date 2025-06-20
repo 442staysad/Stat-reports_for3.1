@@ -642,6 +642,26 @@ namespace Stat_reports.Controllers
             }
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetBranchesWithAcceptedReports(int templateId, int year, int? month, int? quarter, int? halfYear)
+        {
+            if (templateId == 0)
+            {
+                return Json(new List<BranchDto>()); // Возвращаем пустой список, если шаблон не выбран
+            }
+
+            try
+            {
+                var branches = await _branchService.GetBranchesWithAcceptedReportsAsync(templateId, year, month, quarter, halfYear);
+                return Json(branches);
+            }
+            catch (Exception ex)
+            {
+                // TODO: Залогировать ошибку
+                return StatusCode(500, "Произошла ошибка при загрузке филиалов.");
+            }
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken] // Защита от CSRF
         public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentRequest model)

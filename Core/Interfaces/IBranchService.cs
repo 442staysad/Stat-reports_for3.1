@@ -17,5 +17,6 @@ namespace Core.Interfaces
         Task<Branch> UpdateBranchAsync(BranchProfileDto dto);
         Task<bool> DeleteBranchAsync(int id);
         Task<bool> ChangeBranchPasswordAsync(BranchChangePasswordDto dto);
+        Task<IEnumerable<BranchDto>> GetBranchesWithAcceptedReportsAsync(int templateId, int year, int? month, int? quarter, int? halfYear);
     }
 }

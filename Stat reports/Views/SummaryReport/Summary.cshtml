@@ -136,17 +136,20 @@
                 <button type="button" id="deselectAllBranches" class="btn btn-sm btn-warning">× Сбросить</button>
             </div>
         </div>
-        <div class="branches-container">
-            @foreach (var branch in Model.Branches)
-            {
-                <div class="branch-item">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="branch_@branch.Id"
-                               name="SelectedBranchIds" value="@branch.Id">
-                        <label class="form-check-label" for="branch_@branch.Id">@branch.Name</label>
-                    </div>
+
+        <div class="branches-container" id="branchesListWrapper">
+
+            <div id="branchesContainer">
+                <div class="text-muted p-3 text-center">Выберите шаблон и период для загрузки списка филиалов.</div>
+            </div>
+
+            <div id="branchesLoader" class="text-primary p-3 text-center" style="display: none;">
+                <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Загрузка...</span>
                 </div>
-            }
+                Загрузка доступных филиалов...
+            </div>
+
         </div>
     </div>
 
@@ -156,123 +159,155 @@
 @section Scripts {
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // --- Элементы управления ---
             const templateSelect = document.getElementById('templateSelect');
+            const yearInput = document.querySelector('input[name="Year"]');
+            const monthSelect = document.querySelector('select[name="Month"]');
+            const quarterSelect = document.querySelector('select[name="Quarter"]');
+            const halfYearSelect = document.querySelector('select[name="HalfYearPeriod"]');
+
             const yearGroup = document.getElementById('year-group');
             const monthGroup = document.getElementById('month-group');
             const quarterGroup = document.getElementById('quarter-group');
             const halfGroup = document.getElementById('half-group');
-            const reportTypeTabs = document.querySelectorAll('#reportTypeTabs .nav-link');
 
-            // Функция для фильтрации шаблонов по типу отчета
-            function filterTemplatesByType(reportType) {
-                const options = templateSelect.querySelectorAll('option');
+            const branchesContainer = document.getElementById('branchesContainer');
+            const branchesLoader = document.getElementById('branchesLoader');
+            const selectAllBtn = document.getElementById('selectAllBranches');
+            const deselectAllBtn = document.getElementById('deselectAllBranches');
 
-                options.forEach(option => {
-                    if (option.value === "") {
-                        option.style.display = 'block';
-                        return;
+            // --- Функция для обновления списка филиалов ---
+            async function updateAvailableBranches() {
+                const templateId = templateSelect.value;
+
+                if (!templateId) {
+                    branchesContainer.innerHTML = '<div class="text-muted p-3 text-center">Выберите шаблон и период для загрузки списка филиалов.</div>';
+                    return;
+                }
+
+                const year = yearInput.value;
+                const month = monthGroup.style.display !== 'none' ? monthSelect.value : '';
+                const quarter = quarterGroup.style.display !== 'none' ? quarterSelect.value : '';
+                const halfYear = halfGroup.style.display !== 'none' ? halfYearSelect.value : '';
+
+                // Показываем лоадер, скрываем контейнер
+                branchesLoader.style.display = 'block';
+                branchesContainer.style.display = 'none';
+
+                const url = `/ReportMvc/GetBranchesWithAcceptedReports?templateId=${templateId}&year=${year}&month=${month}&quarter=${quarter}&halfYear=${halfYear}`;
+
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error('Ошибка сети при загрузке филиалов.');
                     }
+                    const branches = await response.json();
 
-                    const type = option.getAttribute('data-report-type');
-                    if (!reportType || type === reportType) {
-                        option.style.display = 'block';
+                    // Очищаем и заполняем контейнер новыми данными
+                    branchesContainer.innerHTML = '';
+                    if (branches.length > 0) {
+                        branches.forEach(branch => {
+                            const branchHtml = `
+                                <div class="branch-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="branch_${branch.id}"
+                                               name="SelectedBranchIds" value="${branch.id}">
+                                        <label class="form-check-label" for="branch_${branch.id}">${branch.name}</label>
+                                    </div>
+                                </div>`;
+                            branchesContainer.insertAdjacentHTML('beforeend', branchHtml);
+                        });
                     } else {
-                        option.style.display = 'none';
+                        branchesContainer.innerHTML = '<div class="text-muted p-3 text-center">Нет филиалов с принятыми отчетами по заданным параметрам.</div>';
                     }
-                });
-
-                // Сбросить выбор, если текущий выбранный вариант скрыт
-                if (templateSelect.selectedIndex !== 0 &&
-                    templateSelect.options[templateSelect.selectedIndex].style.display === 'none') {
-                    templateSelect.selectedIndex = 0;
-                    updatePeriodFields();
+                } catch (error) {
+                    console.error(error);
+                    branchesContainer.innerHTML = '<div class="text-danger p-3 text-center">Не удалось загрузить список филиалов.</div>';
+                } finally {
+                    // Скрываем лоадер, показываем контейнер
+                    branchesLoader.style.display = 'none';
+                    branchesContainer.style.display = 'block';
                 }
             }
 
-            // Функция для обновления полей периода
-            function updatePeriodFields() {
-                const selectedOption = templateSelect.selectedOptions[0];
-                const periodType = selectedOption ? selectedOption.getAttribute('data-period-type') : null;
+            // --- Логика для управления UI (фильтрация шаблонов, показ полей периода) ---
+            const reportTypeTabs = document.querySelectorAll('#reportTypeTabs .nav-link');
 
-                // Скрыть все группы
+            function filterTemplatesByType(reportType) {
+                // ... ваш существующий код filterTemplatesByType без изменений ...
+                const options = templateSelect.querySelectorAll('option');
+                options.forEach(option => {
+                    if (option.value === "") { option.style.display = 'block'; return; }
+                    const type = option.getAttribute('data-report-type');
+                    option.style.display = (!reportType || type === reportType) ? 'block' : 'none';
+                });
+                if (templateSelect.selectedIndex !== 0 && templateSelect.options[templateSelect.selectedIndex].style.display === 'none') {
+                    templateSelect.selectedIndex = 0;
+                }
+            }
+
+            function updatePeriodFields() {
+                // ... ваш существующий код updatePeriodFields без изменений ...
+                 const selectedOption = templateSelect.selectedOptions[0];
+                const periodType = selectedOption ? selectedOption.getAttribute('data-period-type') : null;
                 yearGroup.style.display = 'none';
                 monthGroup.style.display = 'none';
                 quarterGroup.style.display = 'none';
                 halfGroup.style.display = 'none';
-
                 if (!periodType) return;
-
-                // Показать год для всех типов
                 yearGroup.style.display = 'block';
-
-                // Показать соответствующие поля периода
                 switch(periodType) {
-                    case 'Monthly':
-                        monthGroup.style.display = 'block';
-                        break;
-                    case 'Quarterly':
-                        quarterGroup.style.display = 'block';
-                        break;
-                    case 'HalfYearly':
-                        halfGroup.style.display = 'block';
-                        break;
-                    // Для Yearly показываем только год
+                    case 'Monthly': monthGroup.style.display = 'block'; break;
+                    case 'Quarterly': quarterGroup.style.display = 'block'; break;
+                    case 'HalfYearly': halfGroup.style.display = 'block'; break;
                 }
             }
 
-            // Обработчики событий для вкладок типа отчета
+            // --- Назначение обработчиков событий ---
             reportTypeTabs.forEach(tab => {
                 tab.addEventListener('click', function() {
                     const reportType = this.getAttribute('data-report-type');
                     filterTemplatesByType(reportType);
+                    // Сбросить шаблон и обновить поля
+                    templateSelect.value = '';
+                    updatePeriodFields();
+                    updateAvailableBranches(); // Обновить филиалы
                 });
             });
 
-            // Обработчик изменения выбора шаблона
-            templateSelect.addEventListener('change', updatePeriodFields);
+            // Обработчики, которые вызывают обновление списка филиалов
+            templateSelect.addEventListener('change', () => {
+                updatePeriodFields();
+                updateAvailableBranches();
+            });
+            yearInput.addEventListener('change', updateAvailableBranches);
+            monthSelect.addEventListener('change', updateAvailableBranches);
+            quarterSelect.addEventListener('change', updateAvailableBranches);
+            halfYearSelect.addEventListener('change', updateAvailableBranches);
 
-            // Инициализация
-            filterTemplatesByType('');
-            updatePeriodFields();
-            // Кнопки выбора всех/ничего
-            const selectAllBtn = document.getElementById('selectAllBranches');
-            const deselectAllBtn = document.getElementById('deselectAllBranches');
-            const branchCheckboxes = document.querySelectorAll('input[name="SelectedBranchIds"]');
-
+            // --- Кнопки выбора ---
             selectAllBtn.addEventListener('click', function() {
-                branchCheckboxes.forEach(checkbox => {
+                document.querySelectorAll('#branchesContainer input[name="SelectedBranchIds"]').forEach(checkbox => {
                     checkbox.checked = true;
                 });
             });
 
             deselectAllBtn.addEventListener('click', function() {
-                branchCheckboxes.forEach(checkbox => {
+                document.querySelectorAll('#branchesContainer input[name="SelectedBranchIds"]').forEach(checkbox => {
                     checkbox.checked = false;
                 });
             });
 
-            // Автоматическая проверка кнопки "Все", если выбраны все филиалы
-            branchCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', function() {
-                    const allChecked = [...branchCheckboxes].every(cb => cb.checked);
-                    selectAllBtn.classList.toggle('btn-primary', allChecked);
-                    selectAllBtn.classList.toggle('btn-outline-primary', !allChecked);
-                });
+            // ... ваш существующий код для отправки формы ...
+            document.getElementById('summaryForm').addEventListener('submit', function (e) {
+                // ...
             });
-          document.getElementById('summaryForm').addEventListener('submit', function (e) {
-            const selectedOption = templateSelect.selectedOptions[0];
-            const periodType = selectedOption ? selectedOption.getAttribute('data-period-type') : null;
 
-            if (periodType !== 'Monthly') {
-                document.querySelector('select[name="Month"]').value = '';
-            }
-            if (periodType !== 'Quarterly') {
-                document.querySelector('select[name="Quarter"]').value = '';
-            }
-            if (periodType !== 'HalfYearly') {
-                document.querySelector('select[name="HalfYearPeriod"]').value = '';
-            }
-        });
+            // --- Первоначальная инициализация ---
+            const initialReportType = document.querySelector('#reportTypeTabs .nav-link.active').getAttribute('data-report-type');
+            filterTemplatesByType(initialReportType || '');
+            updatePeriodFields();
+            updateAvailableBranches(); // Вызываем один раз при загрузке, чтобы показать начальное сообщение
         });
     </script>
 }

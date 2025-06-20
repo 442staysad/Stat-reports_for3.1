@@ -5,8 +5,10 @@ using System.Text;
 using System.Threading.Tasks;
 using Core.DTO;
 using Core.Entities;
+using Core.Enums;
 using Core.Interfaces;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Core.Services
 {
@@ -138,5 +140,54 @@ namespace Core.Services
             return true;
         }
 
+        public async Task<IEnumerable<BranchDto>> GetBranchesWithAcceptedReportsAsync(int templateId, int year, int? month, int? quarter, int? halfYear)
+        {
+            // Начинаем запрос к срокам сдачи, включая связанные филиалы
+            var query = (await _unitOfWork.SubmissionDeadlines
+                .GetAll(includes: q => q.Include(d => d.Template).Include(d => d.Branch)).ToListAsync())
+                .Where(d => d.Template != null &&
+                            d.Template.Id == templateId &&
+                            d.Period.Year == year &&
+                            d.Status == ReportStatus.Reviewed &&
+                            d.Branch != null && d.Branch.Name != "Admin");// Филиал должен существовать и не быть "Admin"
+
+            // Применяем фильтр по периоду в зависимости от того, что было передано
+            if (month.HasValue)
+            {
+                query = query.Where(d => d.Period.Month == month.Value);
+            }
+            else if (quarter.HasValue)
+            {
+                var monthsInQuarter = GetQuarterMonths(quarter.Value); // Предполагается, что у вас есть хелпер для этого
+                query = query.Where(d => monthsInQuarter.Contains(d.Period.Month));
+            }
+            else if (halfYear.HasValue)
+            {
+                var monthsInHalfYear = halfYear.Value == 1 ? new[] { 1, 2, 3, 4, 5, 6 } : new[] { 7, 8, 9, 10, 11, 12 };
+                query = query.Where(r => monthsInHalfYear.Contains(r.Period.Month));
+            }
+            // Для годового отчета дополнительная фильтрация по периоду не нужна
+
+            // Выбираем уникальные филиалы из отфильтрованных записей и проецируем в DTO
+            var branches = query
+                .Select(d => d.Branch)
+                .Distinct()
+                .Select(b => new BranchDto { Id = b.Id, Name = b.Name })
+                .OrderBy(b => b.Name);
+                
+
+            return branches.ToList();
+        }
+        private List<int> GetQuarterMonths(int quarter)
+        {
+            return quarter switch
+            {
+                1 => new List<int> { 1, 2, 3 },
+                2 => new List<int> { 4, 5, 6 },
+                3 => new List<int> { 7, 8, 9 },
+                4 => new List<int> { 10, 11, 12 },
+                _ => throw new ArgumentOutOfRangeException(nameof(quarter), "Номер квартала должен быть от 1 до 4.")
+            };
+        }
     }
 }
