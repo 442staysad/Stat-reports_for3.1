@@ -6,7 +6,7 @@
     // Получаем ID филиала текущего пользователя из сессии
     int? userBranchId = HttpContextAccessor.HttpContext?.Session?.GetInt32("BranchId");
     string currentUserRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value; // Получаем роль текущего пользователя
-
+    int? currentUserId = HttpContextAccessor.HttpContext?.Session?.GetInt32("UserId");
     // Определяем, является ли пользователь глобальным (может видеть все филиалы)
     bool canViewAllBranches = User.IsInRole("Admin") || User.IsInRole("PEB") || User.IsInRole("OBUnF");
 
@@ -31,48 +31,48 @@
 }
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/pendingReports.css" />
-    <style>
-        .modal-body .list-group-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+<link rel="stylesheet" href="~/css/pendingReports.css" />
+<style>
+    .modal-body .list-group-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    }
 
-            .modal-body .list-group-item span {
-                flex-grow: 1; /* Занять доступное пространство */
-                margin-right: 10px; /* Отступ справа от текста */
-            }
+    .modal-body .list-group-item span {
+    flex-grow: 1; /* Занять доступное пространство */
+    margin-right: 10px; /* Отступ справа от текста */
+    }
 
-        .action-buttons form {
-            display: inline-block; /* Чтобы формы кнопок были в ряд */
-            margin-left: 5px; /* Небольшой отступ между кнопками */
-        }
+    .action-buttons form {
+    display: inline-block; /* Чтобы формы кнопок были в ряд */
+    margin-left: 5px; /* Небольшой отступ между кнопками */
+    }
 
 
-        .modal-backdrop {
-            display: none !important;
-        }
+    .modal-backdrop {
+    display: none !important;
+    }
 
-            .modal-backdrop.show {
-                display: none !important;
-            }
+    .modal-backdrop.show {
+    display: none !important;
+    }
 
-        .modal {
-            z-index: 1050 !important; /* Убедись, что модалка всегда выше фона */
-        }
+    .modal {
+    z-index: 1050 !important; /* Убедись, что модалка всегда выше фона */
+    }
 
-            .action-buttons form:first-child {
-                margin-left: 0; /* Убрать отступ для первой кнопки */
-            }
+    .action-buttons form:first-child {
+    margin-left: 0; /* Убрать отступ для первой кнопки */
+    }
 
-        .pagination {
-            margin-top: 15px;
-            display: flex;
-            justify-content: center;
-            gap: 5px; /* Промежуток между кнопками пагинации */
-        }
-    </style>
+    .pagination {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 5px; /* Промежуток между кнопками пагинации */
+    }
+</style>
 }
 
 <div class="main-container">
@@ -106,6 +106,12 @@
             @TempData["Success"]
         </div>
     }
+    else if (TempData["Error"] != null)
+    {
+        <div class="alert alert-success">
+            @TempData["Error"]
+        </div>
+    }
     @* Табы по типам отчетов (Плановые/Бухгалтерские) *@
     <ul class="nav nav-tabs mb-3" id="reportTypeTabs" role="tablist">
         <li class="nav-item" role="presentation">
@@ -134,13 +140,13 @@
                 var branch = visibleBranches[i];
                 <li class="nav-item" role="presentation">
                     <button class="nav-link @(i == 0 ? "active" : "")"
-                            id="tab-@branch.BranchId"
-                            data-bs-toggle="tab"
-                            data-bs-target="#branch-@branch.BranchId"
-                            type="button"
-                            role="tab"
-                            aria-controls="branch-@branch.BranchId"
-                            aria-selected="@(i == 0 ? "true" : "false")">
+                    id="tab-@branch.BranchId"
+                    data-bs-toggle="tab"
+                    data-bs-target="#branch-@branch.BranchId"
+                    type="button"
+                    role="tab"
+                    aria-controls="branch-@branch.BranchId"
+                    aria-selected="@(i == 0 ? "true" : "false")">
                         @* Отображаем название филиала и значок черновиков, если пользователь глобальный *@
                         <span class="d-inline-flex align-items-center gap-1">
                             @branch.BranchName
@@ -202,8 +208,10 @@
                                                         Комментарий
                                                     </button>
 
-                                                    <div class="modal" id="commentModal-@item.ReportId" tabindex="-1"
-                                                         aria-labelledby="commentModalLabel-@item.ReportId" aria-hidden="true">
+                                                    @* Добавляем уникальные data-атрибуты с ID комментария и отчета для JavaScript *@
+                                                    <div class="modal comment-modal" id="commentModal-@item.ReportId" tabindex="-1"
+                                                    data-report-id="@item.ReportId" data-comment-id="@item.CommentId"
+                                                    aria-labelledby="commentModalLabel-@item.ReportId" aria-hidden="true">
                                                         <div class="modal-dialog modal-dialog-centered">
                                                             <div class="modal-content">
                                                                 <div class="modal-header">
@@ -215,12 +223,35 @@
                                                                         <strong>@item.TemplateName</strong><br />
                                                                         <small class="text-muted">Срок: @item.Deadline.ToString("dd.MM.yyyy")</small>
                                                                     </div>
-                                                                    <div class="p-3 bg-light rounded text-dark">
-                                                                        @item.Comment
+
+                                                                    @* Блок для вывода сообщений *@
+                                                                    <div class="comment-message-area alert d-none" role="alert"></div>
+
+                                                                    @* Блок для отображения комментария (по умолчанию видим) *@
+                                                                    <div class="comment-display-view">
+                                                                        <div class="p-3 bg-light rounded text-dark comment-text">
+                                                                            @item.Comment
+                                                                        </div>
                                                                     </div>
+
+                                                                    @* Блок для редактирования комментария (по умолчанию скрыт) *@
+                                                                    <div class="comment-edit-view" style="display: none;">
+                                                                        <textarea class="form-control comment-textarea" rows="4">@item.Comment</textarea>
+                                                                    </div>
+
                                                                 </div>
                                                                 <div class="modal-footer">
-                                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                                    @* Кнопка "Редактировать" видна только автору комментария *@
+                                                                    @if (item.LatestCommentAuthorId == currentUserId)
+                                                                    {
+                                                                        <button type="button" class="btn btn-warning btn-edit-comment">Редактировать</button>
+                                                                    }
+
+                                                                    @* Кнопки, которые появляются в режиме редактирования *@
+                                                                    <button type="button" class="btn btn-success btn-save-comment" style="display: none;">Сохранить</button>
+                                                                    <button type="button" class="btn btn-secondary btn-cancel-edit" style="display: none;">Отмена</button>
+
+                                                                    <button type="button" class="btn btn-secondary btn-close-modal" data-bs-dismiss="modal">Закрыть</button>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -234,7 +265,7 @@
                                                     @if (new[] { ReportStatus.Draft, ReportStatus.NeedsCorrection }.Contains(item.Status))
                                                     {
                                                         @* Кнопка загрузки видна только если это отчет текущего филиала пользователя или он Admin/AdminTrest *@
-                                                        @if (item.BranchId == userBranchId || User.IsInRole("Admin") || User.IsInRole("AdminTrest"))
+                                                        @if (item.BranchId == userBranchId || User.IsInRole("Admin"))
                                                         {
                                                             <form asp-action="UploadReport" asp-controller="ReportMvc" method="post" enctype="multipart/form-data" class="d-inline-block">
                                                                 <input type="hidden" name="templateId" value="@item.TemplateId" />
@@ -247,6 +278,17 @@
 
                                                                 </div>
                                                             </form>
+                                                            if (item.Status==ReportStatus.Draft) {
+                                                                <form asp-action="CancelUpload" asp-route-id="@item.DeadlineId" method="post" class="d-inline-block">
+                                                                    @* Рекомендуется добавить токен антиподделки для POST запросов *@
+                                                                <input type="hidden" name="deadlineId" value="@item.DeadlineId" />
+                                                                @Html.AntiForgeryToken()
+                                                                <button type="submit" class="btn btn-sm btn-danger"
+                                                                        onclick="return confirm('Вы уверены, что хотите отменить загрузку отчета?');"
+                                                                        title="Отмена">
+                                                                    ❌
+                                                                </button>
+                                                            </form>}
                                                         }
                                                         <a asp-action="PreviewExcel" asp-route-reportId="@item.ReportId" asp-route-deadlineId="@item.DeadlineId" class="btn btn-sm btn-primary">
                                                             Просмотр
@@ -285,20 +327,23 @@
                                                     @if (canDeleteThisDeadline)
                                                     {
                                                         <a href="@Url.Action("EditDeadline", "ReportMvc", new { id = item.DeadlineId })"
-                                                           class="btn btn-sm btn-info me-2" 
-                                                           title="Изменить срок сдачи">
+                                                        class="btn btn-sm btn-info me-2" 
+                                                        title="Изменить срок сдачи">
                                                             ✏️
                                                         </a>
-                                                        @* Используем form для отправки DELETE запроса *@
-                                                        <form asp-action="DeleteDeadline" asp-route-id="@item.DeadlineId" method="post" class="d-inline-block">
-                                                            @* Рекомендуется добавить токен антиподделки для POST запросов *@
+                                                        if (User.IsInRole("Admin"))
+                                                        {
+
+                                                            @* Используем form для отправки DELETE запроса *@
+                                                            <form asp-action="DeleteDeadline" asp-route-id="@item.DeadlineId" method="post" class="d-inline-block">
+                                                                @* Рекомендуется добавить токен антиподделки для POST запросов *@
                                                             @Html.AntiForgeryToken()
                                                             <button type="submit" class="btn btn-sm btn-danger"
                                                                     onclick="return confirm('Вы уверены, что хотите удалить этот срок сдачи отчета?');"
                                                                     title="Удалить срок сдачи">
                                                                 ❌
                                                             </button>
-                                                        </form>
+                                                        </form>}
                                                     }
 
                                                 </div>
@@ -379,7 +424,7 @@
                 canDeletePlan: @canDeletePlan.ToString().ToLower(),
                 canDeleteAccountant: @canDeleteAccountant.ToString().ToLower()
             };
-
+            const antiforgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
             const editTemplateUrl = '@Url.Action("EditTemplate", "ReportMVC")'; // Adjust "ReportMVC" if your controller name is different
             const templateManagementUrl = '@Url.Action("GetTemplatesForManagement", "ReportMvc")'; // URL для получения шаблонов
             const deleteTemplateUrl = '@Url.Action("DeleteTemplate", "ReportMvc")'; // URL для удаления шаблона (без ID)
@@ -740,6 +785,124 @@
 
                 // Финальный вызов для применения фильтрации и пагинации после инициализации табов
                 filterAndPaginateActiveTab();
+
+                    // Функция для переключения между режимами просмотра и редактирования
+        function toggleCommentView(modal, toEditMode) {
+            const displayView = modal.querySelector('.comment-display-view');
+            const editView = modal.querySelector('.comment-edit-view');
+
+            const editButton = modal.querySelector('.btn-edit-comment');
+            const closeButton = modal.querySelector('.btn-close-modal');
+            const saveButton = modal.querySelector('.btn-save-comment');
+            const cancelButton = modal.querySelector('.btn-cancel-edit');
+
+            if (toEditMode) {
+                // Переключаемся в режим редактирования
+                displayView.style.display = 'none';
+                editView.style.display = 'block';
+                editButton.style.display = 'none';
+                closeButton.style.display = 'none';
+                saveButton.style.display = 'inline-block';
+                cancelButton.style.display = 'inline-block';
+                // Копируем текст на случай отмены
+                editView.querySelector('.comment-textarea').dataset.originalText = displayView.querySelector('.comment-text').innerText;
+            } else {
+                // Возвращаемся в режим просмотра
+                displayView.style.display = 'block';
+                editView.style.display = 'none';
+                if(editButton) editButton.style.display = 'inline-block';
+                closeButton.style.display = 'inline-block';
+                saveButton.style.display = 'none';
+                cancelButton.style.display = 'none';
+            }
+        }
+
+        // Навешиваем обработчики на все модальные окна комментариев
+        document.querySelectorAll('.comment-modal').forEach(modal => {
+            const editButton = modal.querySelector('.btn-edit-comment');
+            const cancelButton = modal.querySelector('.btn-cancel-edit');
+            const saveButton = modal.querySelector('.btn-save-comment');
+
+            // Клик по кнопке "Редактировать"
+            if (editButton) {
+                editButton.addEventListener('click', function () {
+                    toggleCommentView(modal, true);
+                });
+            }
+
+            // Клик по кнопке "Отмена"
+            cancelButton.addEventListener('click', function () {
+                // Восстанавливаем оригинальный текст
+                const textarea = modal.querySelector('.comment-textarea');
+                textarea.value = textarea.dataset.originalText;
+                toggleCommentView(modal, false);
+                // Скрываем сообщения
+                modal.querySelector('.comment-message-area').classList.add('d-none');
+            });
+
+            // Клик по кнопке "Сохранить" - AJAX запрос
+            saveButton.addEventListener('click', async function () {
+                const commentId = modal.dataset.commentId;
+                const textarea = modal.querySelector('.comment-textarea');
+                const newCommentText = textarea.value.trim();
+                const messageArea = modal.querySelector('.comment-message-area');
+
+                // Блокируем кнопку на время запроса
+                saveButton.disabled = true;
+                saveButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
+
+                try {
+                    const response = await fetch('/ReportMvc/UpdateComment', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': antiforgeryToken
+                        },
+                        body: JSON.stringify({
+                            commentId: parseInt(commentId),
+                            commentText: newCommentText
+                        })
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success) {
+                            // Успех: обновляем текст и переключаемся в режим просмотра
+                            modal.querySelector('.comment-text').innerText = result.newText;
+                            textarea.dataset.originalText = result.newText; // Обновляем "оригинальный" текст
+                            toggleCommentView(modal, false);
+
+                            // Показываем сообщение об успехе
+                            messageArea.classList.remove('d-none', 'alert-danger');
+                            messageArea.classList.add('alert-success');
+                            messageArea.textContent = 'Комментарий успешно обновлен.';
+
+                            // Скрываем сообщение через 3 секунды
+                            setTimeout(() => messageArea.classList.add('d-none'), 3000);
+                        } else {
+                            // Ошибка, которую вернул сервер (например, валидация)
+                            throw new Error(result.message || 'Не удалось обновить комментарий.');
+                        }
+                    } else {
+                         // Сетевая ошибка или ошибка прав доступа (403 Forbid)
+                         let errorMsg = `Ошибка сети: ${response.statusText}`;
+                         if (response.status === 403) {
+                             errorMsg = "У вас нет прав для редактирования этого комментария.";
+                         }
+                         throw new Error(errorMsg);
+                    }
+                } catch (error) {
+                    // Показываем сообщение об ошибке
+                    messageArea.classList.remove('d-none', 'alert-success');
+                    messageArea.classList.add('alert-danger');
+                    messageArea.textContent = error.message;
+                } finally {
+                    // Возвращаем кнопку в исходное состояние
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = 'Сохранить';
+                }
+            });
+        });
 
             }); // Конец DOMContentLoaded
 

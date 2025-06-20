@@ -9,6 +9,7 @@ using Core.Entities;
 using Core.Enums;
 using Core.Interfaces;
 using Core.Services;
+using DocumentFormat.OpenXml.Bibliography;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -84,6 +85,24 @@ namespace Stat_reports.Controllers
             TempData["Success"] = "Отчет успешно загружен";
 
             return RedirectToAction(nameof(WorkingReports));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken] // Важно!
+        public async Task<IActionResult> CancelUpload(int deadlineId)
+        {
+            bool result = await _deadlineService.CancelUpload(deadlineId);
+
+            if (result) // Предполагаем, что true означает успех
+            {
+                TempData["Success"] = "Отчет успешно удален.";
+            }
+            else
+            {
+                TempData["Error"] = "Ошибка при удалении отчета."; // Обработка ошибки в сервисе
+            }
+            return RedirectToAction(nameof(WorkingReports));
+
         }
 
         public async Task<IActionResult> Edit(int id)
@@ -294,7 +313,7 @@ namespace Stat_reports.Controllers
         // Этот метод обрабатывает POST-запрос от формы в таблице.
         // Проверка прав производится на сервере перед удалением.
         [HttpPost]
-        [Authorize(Roles = "Admin,AdminTrest,PEB,OBUnF")]
+        [Authorize(Roles = "Admin,AdminTrest")]
         [ValidateAntiForgeryToken] // Важно!
         public async Task<IActionResult> DeleteDeadline(int id)
         {
@@ -386,7 +405,6 @@ namespace Stat_reports.Controllers
         [Authorize(Roles = "Admin,PEB,OBUnF,AdminTrest")]
         public async Task<IActionResult> ReopenReport(int reportId)
         {
-            Console.WriteLine(reportId);
             await _reportService.ReopenReportAsync(reportId);
             return RedirectToAction(nameof(ReportArchive));
         }
@@ -636,18 +654,17 @@ namespace Stat_reports.Controllers
             try
             {
                 // Получаем ID текущего пользователя
-                var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var currentUserId = HttpContext.Session.GetInt32("UserId");
 
                 // Вызываем сервис для обновления комментария
                 // Этот метод в сервисе должен проверить, что currentUserId совпадает с автором комментария
-                var updatedComment = await _deadlineService.UpdateCommentAsync(model.CommentId, model.CommentText, currentUserId);
+                var updatedComment = await _deadlineService.UpdateCommentAsync(model.CommentId, model.CommentText, (int)currentUserId);
 
                 if (updatedComment == null)
                 {
                     // Сервис вернул null, значит, у пользователя нет прав или комментарий не найден
                     return Forbid(); // Или NotFound()
                 }
-
                 // Возвращаем успешный JSON-ответ
                 return Json(new { success = true, newText = updatedComment.Comment });
             }

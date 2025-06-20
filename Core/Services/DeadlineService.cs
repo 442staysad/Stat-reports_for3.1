@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Core.Entities;
 using Core.Enums;
 using Core.Interfaces;
+using DocumentFormat.OpenXml.Bibliography;
 using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -18,12 +19,14 @@ namespace Core.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<DeadlineService> _logger;
         private readonly IFileService _fileService;
+        private readonly INotificationService _notificationService;
 
-        public DeadlineService(IUnitOfWork unitOfWork, ILogger<DeadlineService> logger, IFileService fileService)
+        public DeadlineService(IUnitOfWork unitOfWork, ILogger<DeadlineService> logger, IFileService fileService, INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
             _fileService = fileService;
+            _notificationService = notificationService;
         }
 
         public async Task<SubmissionDeadline> GetDeadlineByIdAsync(int id)
@@ -155,7 +158,42 @@ namespace Core.Services
             return true;
         }
 
+        public async Task<CommentHistory> UpdateCommentAsync(int commentId, string commentText, int currentUserId)
+        {
+            var comment = await _unitOfWork.CommentHistory.FindAsync(c => c.Id == commentId);
+            if (comment == null)
+                throw new KeyNotFoundException($"Комментарий с ID {commentId} не найден.");
+            comment.Comment = commentText;
+            comment.AuthorId = currentUserId;
+            comment.CreatedAt = DateTime.UtcNow;
+            
+            await _unitOfWork.CommentHistory.UpdateAsync(comment);
 
+            var report = await _unitOfWork.Reports.FindAsync(r => r.Id ==comment.ReportId);
+
+            var author = await _unitOfWork.Users.FindAsync(u => u.Id == comment.AuthorId);
+
+            await _notificationService.AddNotificationAsync(
+                (int)report.UploadedById,
+                $"{report.Name}: {author.FullName}:  Комментарий обновлен :{comment}");
+
+            return comment;
+        }
+
+        public async Task<bool> CancelUpload(int id)
+        {
+            var deadline=await _unitOfWork.SubmissionDeadlines.FindAsync(d=> d.Id == id);
+            if (deadline == null) return false;
+            var report= await _unitOfWork.Reports.FindAsync(r=>r.Id==deadline.ReportId);
+            
+            deadline.ReportId = null;
+            deadline.Status = ReportStatus.InProgress;
+            await _unitOfWork.SubmissionDeadlines.UpdateAsync(deadline);
+            await _fileService.DeleteFileAsync(report.FilePath);
+            await _unitOfWork.Reports.DeleteAsync(report);
+            await _unitOfWork.SaveChangesAsync();
+            return true;
+        }
         /*
         private DateTime CalculateNextDeadline(SubmissionDeadline deadline)
         {

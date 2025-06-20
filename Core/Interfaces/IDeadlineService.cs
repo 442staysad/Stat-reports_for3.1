@@ -14,6 +14,7 @@ namespace Core.Interfaces
         Task<bool> DeleteDeadlineAsync(int id);
         Task<SubmissionDeadline> GetDeadlineByIdAsync(int id);
         Task UpdateDeadlineAsync(SubmissionDeadline deadlineToUpdate);
-        Task UpdateCommentAsync(int commentId, string commentText, string currentUserId);
+        Task<CommentHistory> UpdateCommentAsync(int commentId, string commentText, int currentUserId);
+        Task<bool> CancelUpload(int id);
     }
 }
