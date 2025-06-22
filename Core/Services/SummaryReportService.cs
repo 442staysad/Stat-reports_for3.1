@@ -1,4 +1,5 @@
 ﻿using Core.DTO;
+using Microsoft.AspNetCore.Hosting;
 using Core.Entities;
 using Core.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace Core.Services
 {
@@ -14,12 +16,14 @@ namespace Core.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IExcelSplitterService _excelSplitter;
+        private readonly IWebHostEnvironment _webHostEnvironment;
 
         public SummaryReportService(IUnitOfWork unitOfWork,
-                                    IExcelSplitterService excelSplitter)
+                                    IExcelSplitterService excelSplitter, IWebHostEnvironment webHostEnvironment)
         {
             _unitOfWork = unitOfWork;
             _excelSplitter = excelSplitter;
+            _webHostEnvironment = webHostEnvironment;
         }
 
         public async Task<List<Report>> GetReportsForSummaryAsync(int templateId, int year, int? month, int? quarter, int? halfYear, List<int> branchIds)
@@ -54,7 +58,27 @@ namespace Core.Services
         public byte[] MergeReportsToExcel(List<Report> reports, string templatePath, int year, int? month, int? quarter, int? halfYear)
         {
             var paths = reports.Select(r => r.FilePath).ToList();
-            return _excelSplitter.ProcessReports(paths, templatePath, year, month, quarter, halfYear);
+
+            // --- ИЗМЕНЕНИЕ ---
+            // 1. Получаем путь к папке wwwroot
+            string wwwRootPath = _webHostEnvironment.WebRootPath;
+
+            // 2. Формируем полный путь к файлу с подписью
+            // Path.Combine - лучший способ для создания кроссплатформенных путей
+            string signatureFilePath = Path.Combine(wwwRootPath, "docs", "Подпись.xlsx");
+
+            // 3. Передаем динамический путь в ваш сервис
+            byte[] result = _excelSplitter.ProcessReports(
+                paths,
+                templatePath,
+                year,
+                month,
+                quarter,
+                halfYear,
+                signatureFilePath // <-- Используем созданный путь
+            );
+
+            return result;
         }
 
         private List<int> GetQuarterMonths(int quarter)

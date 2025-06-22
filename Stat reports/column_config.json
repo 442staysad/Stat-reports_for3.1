@@ -1,0 +1,14 @@
+{
+  "DefaultKeyColumnIdentifier": "Б",
+  "DefaultKeyColumnName": "Код",
+  "ColumnRules": [
+    {
+      "HeaderName": "Код признака организации",
+      "Action": "TakeHighest"
+    },
+    {
+      "HeaderName": "Примечание",
+      "Action": "Copy"
+    }
+  ]
+}
