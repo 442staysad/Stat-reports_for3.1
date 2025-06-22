@@ -137,7 +137,7 @@ namespace Core.Services
 
                 var filePath1 = await _fileService.SaveFileAsync(file, "Reports", branch.Name, DateTime.Now.Year, template.Name); // <-- 2. Сохраняем новый файл (ЭТО НУЖНО СДЕЛАТЬ ЗДЕСЬ)
 
-                existingReport.Name = Path.GetFileNameWithoutExtension(file.FileName);
+                existingReport.Name = template.Name;
                 existingReport.FilePath = filePath1; // <-- 3. Обновляем путь к файлу в базе данных
                 existingReport.UploadedById = uploadedById;
                 existingReport.UploadDate = DateTime.UtcNow;
@@ -155,7 +155,7 @@ namespace Core.Services
             var filePath = await _fileService.SaveFileAsync(file, "Reports", branch.Name, DateTime.Now.Year, template.Name);
             var newReport = new Report
             {
-                Name = Path.GetFileNameWithoutExtension(file.FileName),
+                Name = template.Name,
                 TemplateId = templateId,
                 BranchId = branchId,
                 UploadedById = uploadedById,

@@ -9,6 +9,10 @@
     {
       "HeaderName": "Примечание",
       "Action": "Copy"
+    },
+    {
+      "HeaderName": "Код", // Новый заголовок столбца "Код"
+      "Action": "TakeHighest"
     }
   ]
 }
