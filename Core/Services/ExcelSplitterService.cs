@@ -133,7 +133,7 @@ namespace Core.Services
                 }
             }
 
-            targetWorksheet.Columns().AdjustToContents();
+            //targetWorksheet.Columns().AdjustToContents();
         }
 
         private int DetectIdentifierRow(IXLWorksheet worksheet)
@@ -201,33 +201,43 @@ namespace Core.Services
 
             using var signatureWb = new XLWorkbook(signatureFilePath);
             var signatureSheet = signatureWb.Worksheet(1);
-            var sourceRange = signatureSheet.RangeUsed();
+            var rangeUsed = signatureSheet.RangeUsed();
+            var firstCell = rangeUsed.FirstCell();
+            var lastCell = signatureSheet.Cell(rangeUsed.LastRow().RowNumber(), rangeUsed.LastColumn().ColumnNumber() + 1);
+            var sourceRange = signatureSheet.Range(firstCell, lastCell);
+
 
             int rowOffset = insertRow - sourceRange.FirstRow().RowNumber();
             int colOffset = 0;
+            for (int col = 1; col <= sourceRange.ColumnCount(); col++)
+            {
+                var targetColNumber = col + colOffset;
+                double templateWidth = lastWorksheet.Column(targetColNumber).Width;
 
+                // Принудительно задаём ширину колонки в подписи равной ширине колонки в шаблоне
+                signatureSheet.Column(col).Width = templateWidth;
+            }
             // 1. Копируем значения, стили, высоту строк и ширину столбцов
             foreach (var sourceRow in sourceRange.Rows())
             {
                 // Получаем IXLRow (не IXLRangeRow)
                 var sourceWorksheetRow = signatureSheet.Row(sourceRow.RowNumber());
                 var targetRow = lastWorksheet.Row(sourceRow.RowNumber() + rowOffset);
-                targetRow.Height = sourceWorksheetRow.Height;
+                targetRow.Height = sourceWorksheetRow.Height; // Высота строк копируется из подписи
 
                 foreach (var sourceCell in sourceRow.Cells())
                 {
                     var targetCell = lastWorksheet.Cell(targetRow.RowNumber(), sourceCell.Address.ColumnNumber + colOffset);
-                    targetCell.Value = sourceCell.Value;
-                    targetCell.Style = sourceCell.Style;
+                    targetCell.Value = sourceCell.Value; // Значение копируется из подписи
+                    targetCell.Style = sourceCell.Style; // Стили (включая границы) копируются из подписи
 
-                    // Копируем ширину столбца (один раз)
-                    var targetCol = sourceCell.Address.ColumnNumber + colOffset;
-                    lastWorksheet.Column(targetCol).Width = signatureSheet.Column(sourceCell.Address.ColumnNumber).Width;
+
+                    // var targetCol = sourceCell.Address.ColumnNumber + colOffset;
+                    // lastWorksheet.Column(targetCol).Width = signatureSheet.Column(sourceCell.Address.ColumnNumber).Width;
                 }
             }
 
             // 2. Копируем объединённые ячейки
-            // Внимание: берем объединения именно из signatureSheet, фильтруя те, что внутри sourceRange
             var mergedRanges = signatureSheet.MergedRanges
                 .Where(r => r.RangeAddress.Intersects(sourceRange.RangeAddress));
 

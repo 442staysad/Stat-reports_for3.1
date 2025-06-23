@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.IO;
+using Core.Enums;
 
 namespace Core.Services
 {
@@ -26,27 +27,71 @@ namespace Core.Services
             _webHostEnvironment = webHostEnvironment;
         }
 
-        public async Task<List<Report>> GetReportsForSummaryAsync(int templateId, int year, int? month, int? quarter, int? halfYear, List<int> branchIds)
+        public async Task<List<Report>> GetReportsForSummaryAsync(
+            int templateId,
+            int year,
+            int? month,
+            int? quarter,
+            int? halfYear,
+            List<int> branchIds)
         {
-            var reports = await _unitOfWork.Reports.FindAllAsync(r =>
-                r.TemplateId == templateId &&
-                r.Period.Year == year &&
-                branchIds.Contains((int)r.BranchId));
+            var template = await _unitOfWork.ReportTemplates.FindAsync(t => t.Id == templateId);
+            if (template == null)
+                return new List<Report>(); // Или выбросить исключение
 
-            if (month != null)
-                reports = reports.Where(r => r.Period.Month == month).ToList();
-            else if (quarter != null)
+            DateTime? startDate = null;
+            DateTime? endDate = null;
+
+            if (year > 0)
             {
-                var months = GetQuarterMonths(quarter.Value);
-                reports = reports.Where(r => months.Contains(r.Period.Month)).ToList();
-            }
-            else if (halfYear != null)
-            {
-                var months = halfYear == 1 ? new[] { 1, 2, 3, 4, 5, 6 } : new[] { 7, 8, 9, 10, 11, 12 };
-                reports = reports.Where(r => months.Contains(r.Period.Month)).ToList();
+                startDate = new DateTime(year, 1, 1);
+                endDate = new DateTime(year, 12, 31);
+
+                switch (template.DeadlineType)
+                {
+                    case DeadlineType.Monthly:
+                        if (month.HasValue)
+                        {
+                            startDate = new DateTime(year, month.Value, 1);
+                            endDate = new DateTime(year, month.Value, DateTime.DaysInMonth(year, month.Value));
+                        }
+                        break;
+
+                    case DeadlineType.Quarterly:
+                        if (quarter.HasValue)
+                        {
+                            int startMonth = (quarter.Value - 1) * 3 + 1;
+                            int endMonth = startMonth + 2;
+                            startDate = new DateTime(year, startMonth, 1);
+                            endDate = new DateTime(year, endMonth, DateTime.DaysInMonth(year, endMonth));
+                        }
+                        break;
+
+                    case DeadlineType.HalfYearly:
+                        if (halfYear.HasValue)
+                        {
+                            int startMonth = halfYear.Value == 1 ? 1 : 7;
+                            int endMonth = halfYear.Value == 1 ? 6 : 12;
+                            startDate = new DateTime(year, startMonth, 1);
+                            endDate = new DateTime(year, endMonth, DateTime.DaysInMonth(year, endMonth));
+                        }
+                        break;
+
+                    case DeadlineType.Yearly:
+                        // already set
+                        break;
+                }
             }
 
-            return reports.ToList();
+            var query = _unitOfWork.Reports.GetAll().AsQueryable()
+                .Where(r =>
+                    r.TemplateId == templateId &&
+                    r.Period >= startDate &&
+                    r.Period <= endDate &&
+                    r.BranchId.HasValue &&
+                    branchIds.Contains(r.BranchId.Value));
+
+            return await query.ToListAsync();
         }
 
         public Task<string> GetTemplateFilePathAsync(int templateId)
