@@ -2,6 +2,7 @@
 using Core.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -253,10 +254,115 @@ namespace Core.Services
             }
         }
 
-
-        private void InsertPeriodDescription(XLWorkbook workbook, int year, int? month, int? quarter, int? halfYear)
+        public byte[] ProcessFixedStructureReport(List<string> filePaths, string templatePath, int year, int month, string signatureFilePath)
         {
-            // Реализуйте при необходимости
+            using var resultWorkbook = new XLWorkbook(templatePath);
+            var targetWorksheet = resultWorkbook.Worksheet(1);
+
+            int startRow = 2;
+            int endRow = 48;
+            int sourceColIndex = 4;   // Столбец D
+            int targetColIndex = 4;   // Столбец D
+
+            // >>> ГАРАНТИРОВАННАЯ ПРОВЕРКА ВЫЗОВА <<<
+            System.Diagnostics.Debug.WriteLine("---------------------------------------------------------");
+            System.Diagnostics.Debug.WriteLine("=== [SERVICE DEBUG] ProcessFixedStructureReport: ВЫЗВАН ===");
+            System.Diagnostics.Debug.WriteLine($"Количество файлов на входе: {filePaths?.Count ?? 0}");
+            System.Diagnostics.Debug.WriteLine("---------------------------------------------------------");
+
+            // Если список файлов пуст, возвращаем пустой шаблон.
+            if (filePaths == null || filePaths.Count == 0)
+            {
+                System.Diagnostics.Debug.WriteLine("!!! [SERVICE DEBUG] Список файлов пуст. Возвращаем шаблон.");
+                using var tempMs = new MemoryStream();
+                resultWorkbook.SaveAs(tempMs);
+                return tempMs.ToArray();
+            }
+
+            foreach (var filePath in filePaths)
+            {
+                System.Diagnostics.Debug.WriteLine($"--- [SERVICE DEBUG] Обрабатывается файл: {Path.GetFileName(filePath)} (Целевой столбец (число): {targetColIndex}) ---");
+
+                if (!File.Exists(filePath))
+                {
+                    System.Diagnostics.Debug.WriteLine($"!!! [SERVICE DEBUG] Файл не найден: {filePath}");
+                    continue;
+                }
+
+                using var sourceWorkbook = new XLWorkbook(filePath);
+                var sourceWorksheet = sourceWorkbook.Worksheet(1);
+
+                if (sourceWorksheet == null) continue;
+
+                for (int row = startRow; row <= endRow; row++)
+                {
+                    var sourceCell = sourceWorksheet.Cell(row, sourceColIndex);
+                    var sourceValue = sourceCell.Value;
+
+                    // Логируем считанное значение из исходной ячейки [Строка, Столбец D]
+                    System.Diagnostics.Debug.WriteLine($"[R{row}, C{sourceColIndex} (D)] Считанное значение: '{sourceValue}'");
+
+                    if (!sourceValue.IsBlank)
+                    {
+                        var targetCell = targetWorksheet.Cell(row, targetColIndex);
+                        targetCell.Value = sourceValue;
+                        targetCell.Style = sourceCell.Style;
+                    }
+                }
+
+                targetColIndex++;
+            }
+
+            InsertPeriodDescription(resultWorkbook, year, month, null, null);
+            InsertSignature(resultWorkbook, signatureFilePath);
+
+            // ЕДИНСТВЕННОЕ правильное место для объявления ms
+            using var ms = new MemoryStream();
+            resultWorkbook.SaveAs(ms);
+            return ms.ToArray();
+        }
+
+
+        private void InsertPeriodDescription(IXLWorkbook workbook, int year, int? month, int? quarter, int? halfYear)
+        {
+            var worksheet = workbook.Worksheet(1); // Первый лист
+            string periodText = GetPeriodText(year, month, quarter, halfYear);
+
+            // Найдем первую строку с текстом "Отчет о", и заменим/допишем
+            var cell = worksheet.CellsUsed()
+            .FirstOrDefault(c => c.GetString().Trim().EndsWith(" за"));
+
+            if (cell != null)
+            {
+                // Заменим текст
+                cell.Value = $"{cell.GetString().Split("за")[0].Trim()} за {periodText}";
+            }
+        }
+
+        private string GetPeriodText(int year, int? month, int? quarter, int? halfYear)
+        {
+            if (month != null)
+            {
+                string monthName = CultureInfo.GetCultureInfo("ru-RU").DateTimeFormat.GetMonthName(month.Value);
+                return $"{monthName} {year}";
+            }
+            else if (quarter != null)
+            {
+                return quarter switch
+                {
+                    1 => $"январь-март {year}",
+                    2 => $"апрель-июнь {year}",
+                    3 => $"июль-сентябрь {year}",
+                    4 => $"октябрь-декабрь {year}",
+                    _ => $"квартал {quarter} {year}"
+                };
+            }
+            else if (halfYear != null)
+            {
+                return halfYear == 1 ? $"январь-июнь {year}" : $"июль-декабрь {year}";
+            }
+
+            return $"{year} год";
         }
 
         private enum ColumnAction { Key, Copy, Sum, TakeHighest }

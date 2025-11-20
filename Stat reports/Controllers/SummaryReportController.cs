@@ -66,10 +66,21 @@ public class SummaryReportController : Controller
 
         var templatePath = await _summaryReportService.
             GetTemplateFilePathAsync(model.SelectedTemplateId.Value);
-        var mergedExcel = _summaryReportService.
-          MergeReportsToExcel(reports, templatePath, model.Year.Value, model.Month, model.Quarter, model.HalfYearPeriod);
+        if (model.SelectedTemplateId == 9) {
 
-        return File(mergedExcel, $"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            $"Сводный {model.Templates.FirstOrDefault(t=>t.Id==model.SelectedTemplateId).Name}.xlsx");
+            var mergedExcel = _summaryReportService.MergeFixedStructureReportsToExcel(reports, templatePath, (int)model.Year, (int)model.Month);
+            return File(mergedExcel, $"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Сводный {model.Templates.FirstOrDefault(t => t.Id == model.SelectedTemplateId).Name}.xlsx");
+        }
+        else
+        {
+            var mergedExcel = _summaryReportService.
+              MergeReportsToExcel(reports, templatePath, model.Year.Value, model.Month, model.Quarter, model.HalfYearPeriod);
+
+            return File(mergedExcel, $"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Сводный {model.Templates.FirstOrDefault(t => t.Id == model.SelectedTemplateId).Name}.xlsx");
+
+        }
+        
     }
 }

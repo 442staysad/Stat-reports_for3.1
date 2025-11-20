@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.IO;
 using Core.Enums;
@@ -20,7 +19,8 @@ namespace Core.Services
         private readonly IWebHostEnvironment _webHostEnvironment;
 
         public SummaryReportService(IUnitOfWork unitOfWork,
-                                    IExcelSplitterService excelSplitter, IWebHostEnvironment webHostEnvironment)
+                                    IExcelSplitterService excelSplitter,
+                                    IWebHostEnvironment webHostEnvironment)
         {
             _unitOfWork = unitOfWork;
             _excelSplitter = excelSplitter;
@@ -37,7 +37,7 @@ namespace Core.Services
         {
             var template = await _unitOfWork.ReportTemplates.FindAsync(t => t.Id == templateId);
             if (template == null)
-                return new List<Report>(); // Или выбросить исключение
+                return new List<Report>();
 
             DateTime? startDate = null;
             DateTime? endDate = null;
@@ -78,7 +78,6 @@ namespace Core.Services
                         break;
 
                     case DeadlineType.Yearly:
-                        // already set
                         break;
                 }
             }
@@ -96,23 +95,16 @@ namespace Core.Services
 
         public Task<string> GetTemplateFilePathAsync(int templateId)
         {
-            // Пусть путь хранится в шаблоне
             return _unitOfWork.ReportTemplates.FindAsync(t => t.Id == templateId).ContinueWith(t => t.Result.FilePath);
         }
 
+        // Старый метод для стандартных отчетов
         public byte[] MergeReportsToExcel(List<Report> reports, string templatePath, int year, int? month, int? quarter, int? halfYear)
         {
             var paths = reports.Select(r => r.FilePath).ToList();
-
-            // --- ИЗМЕНЕНИЕ ---
-            // 1. Получаем путь к папке wwwroot
             string wwwRootPath = _webHostEnvironment.WebRootPath;
-
-            // 2. Формируем полный путь к файлу с подписью
-            // Path.Combine - лучший способ для создания кроссплатформенных путей
             string signatureFilePath = Path.Combine(wwwRootPath, "docs", "Подпись.xlsx");
 
-            // 3. Передаем динамический путь в ваш сервис
             byte[] result = _excelSplitter.ProcessReports(
                 paths,
                 templatePath,
@@ -120,10 +112,33 @@ namespace Core.Services
                 month,
                 quarter,
                 halfYear,
-                signatureFilePath // <-- Используем созданный путь
+                signatureFilePath
             );
 
             return result;
+        }
+
+        // --- НОВЫЙ МЕТОД ---
+        // Для отчета с фиксированной структурой (копирование столбцов)
+        public byte[] MergeFixedStructureReportsToExcel(List<Report> reports, string templatePath, int year, int month)
+        {
+
+            // 1. Собираем пути к файлам отчетов
+            var paths = reports.Select(r => r.FilePath).ToList();
+
+            // 2. Путь к файлу подписи
+            string wwwRootPath = _webHostEnvironment.WebRootPath;
+            string signatureFilePath = Path.Combine(wwwRootPath, "docs", "Подпись.xlsx");
+
+            // 3. Вызываем специальный метод в сплиттере
+            // Передаем year и month, так как отчет ежемесячный
+            return _excelSplitter.ProcessFixedStructureReport(
+                paths,
+                templatePath,
+                year,
+                month,
+                signatureFilePath
+            );
         }
 
         private List<int> GetQuarterMonths(int quarter)
