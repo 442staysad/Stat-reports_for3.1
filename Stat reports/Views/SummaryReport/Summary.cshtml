@@ -98,34 +98,36 @@
                    min="2000" max="2100" value="@DateTime.Now.Year" />
         </div>
 
-        <div id="month-group" class="period-group">
-            <label for="Month" class="form-label">Месяц:</label>
-            <select asp-for="Month" class="form-select">
-                @for (int i = 1; i <= 12; i++)
-                {
-                    <option value="@i">@CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(i)</option>
-                }
-            </select>
-        </div>
+    <div id="month-group" class="period-group">
+        <label for="Month" class="form-label">Месяц:</label>
+        <select asp-for="Month" class="form-select">
+            <option value="">-- Выберите месяц --</option>
+            @for (int i = 1; i <= 12; i++)
+            {
+                <option value="@i">@CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(i)</option>
+            }
+        </select>
+    </div>
 
-        <div id="quarter-group" class="period-group">
-            <label for="Quarter" class="form-label">Квартал:</label>
-            <select asp-for="Quarter" class="form-select">
-                <option value="1">Январь-Март</option>
-                <option value="2">Январь-Июнь</option>
-                <option value="3">Январь-Сентябрь</option>
-                <option value="4">Январь-Декабрь</option>
-            </select>
-        </div>
+    <div id="quarter-group" class="period-group">
+        <label for="Quarter" class="form-label">Квартал:</label>
+        <select asp-for="Quarter" class="form-select">
+            <option value="">-- Выберите квартал --</option>
+            <option value="1">Январь-Март</option>
+            <option value="2">Январь-Июнь</option>
+            <option value="3">Январь-Сентябрь</option>
+            <option value="4">Январь-Декабрь</option>
+        </select>
+    </div>
 
-        <div id="half-group" class="period-group">
-            <label for="HalfYearPeriod" class="form-label">Полугодие:</label>
-            <select asp-for="HalfYearPeriod" class="form-select">
-                <option value="1">Январь-Июнь</option>
-                <option value="2">Январь-Декабрь</option>
-            </select>
-        </div>
-
+    <div id="half-group" class="period-group">
+        <label for="HalfYearPeriod" class="form-label">Полугодие:</label>
+        <select asp-for="HalfYearPeriod" class="form-select">
+            <option value="">-- Выберите полугодие --</option>
+            <option value="1">Январь-Июнь</option>
+            <option value="2">Январь-Декабрь</option>
+        </select>
+    </div>
 
     <div class="mb-3">
         <label class="form-label">Филиалы:</label>
@@ -185,6 +187,7 @@
                     return;
                 }
 
+                // ВНИМАНИЕ: Если поля скрыты, их .value может быть пустым, что и требуется.
                 const year = yearInput.value;
                 const month = monthGroup.style.display !== 'none' ? monthSelect.value : '';
                 const quarter = quarterGroup.style.display !== 'none' ? quarterSelect.value : '';
@@ -211,7 +214,7 @@
                                 <div class="branch-item">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="branch_${branch.id}"
-                                               name="SelectedBranchIds" value="${branch.id}">
+                                                name="SelectedBranchIds" value="${branch.id}">
                                         <label class="form-check-label" for="branch_${branch.id}">${branch.name}</label>
                                     </div>
                                 </div>`;
@@ -234,7 +237,6 @@
             const reportTypeTabs = document.querySelectorAll('#reportTypeTabs .nav-link');
 
             function filterTemplatesByType(reportType) {
-                // ... ваш существующий код filterTemplatesByType без изменений ...
                 const options = templateSelect.querySelectorAll('option');
                 options.forEach(option => {
                     if (option.value === "") { option.style.display = 'block'; return; }
@@ -247,14 +249,16 @@
             }
 
             function updatePeriodFields() {
-                // ... ваш существующий код updatePeriodFields без изменений ...
-                 const selectedOption = templateSelect.selectedOptions[0];
+                const selectedOption = templateSelect.selectedOptions[0];
                 const periodType = selectedOption ? selectedOption.getAttribute('data-period-type') : null;
+
                 yearGroup.style.display = 'none';
                 monthGroup.style.display = 'none';
                 quarterGroup.style.display = 'none';
                 halfGroup.style.display = 'none';
+
                 if (!periodType) return;
+
                 yearGroup.style.display = 'block';
                 switch(periodType) {
                     case 'Monthly': monthGroup.style.display = 'block'; break;
@@ -268,18 +272,32 @@
                 tab.addEventListener('click', function() {
                     const reportType = this.getAttribute('data-report-type');
                     filterTemplatesByType(reportType);
+
                     // Сбросить шаблон и обновить поля
                     templateSelect.value = '';
                     updatePeriodFields();
+
+                    // Сброс значений периода при смене вкладки
+                    monthSelect.value = '';
+                    quarterSelect.value = '';
+                    halfYearSelect.value = '';
+
                     updateAvailableBranches(); // Обновить филиалы
                 });
             });
 
-            // Обработчики, которые вызывают обновление списка филиалов
+            // Главный обработчик, который вызывается при смене шаблона
             templateSelect.addEventListener('change', () => {
+                // Сброс значений периода при смене шаблона
+                monthSelect.value = '';
+                quarterSelect.value = '';
+                halfYearSelect.value = '';
+
                 updatePeriodFields();
                 updateAvailableBranches();
             });
+
+            // Обработчики, которые вызывают обновление списка филиалов
             yearInput.addEventListener('change', updateAvailableBranches);
             monthSelect.addEventListener('change', updateAvailableBranches);
             quarterSelect.addEventListener('change', updateAvailableBranches);
@@ -298,9 +316,51 @@
                 });
             });
 
-            // ... ваш существующий код для отправки формы ...
+            // --- ГЛАВНОЕ ИЗМЕНЕНИЕ: Обработчик отправки формы с клиентской валидацией ---
             document.getElementById('summaryForm').addEventListener('submit', function (e) {
-                // ...
+                const templateId = templateSelect.value;
+                const selectedOption = templateSelect.selectedOptions[0];
+                const periodType = selectedOption ? selectedOption.getAttribute('data-period-type') : null;
+
+                // 1. Проверка выбранного шаблона
+                if (!templateId) {
+                    e.preventDefault();
+                    alert('Пожалуйста, выберите Шаблон отчета.');
+                    return;
+                }
+
+                // 2. Проверка обязательных полей периода (только если они видимы)
+
+                // Monthly check
+                if (monthGroup.style.display !== 'none' && !monthSelect.value) {
+                    e.preventDefault();
+                    alert('Пожалуйста, выберите Месяц для данного отчета.');
+                    return;
+                }
+
+                // Quarterly check
+                if (quarterGroup.style.display !== 'none' && !quarterSelect.value) {
+                    e.preventDefault();
+                    alert('Пожалуйста, выберите Квартал для данного отчета.');
+                    return;
+                }
+
+                // HalfYearly check
+                if (halfGroup.style.display !== 'none' && !halfYearSelect.value) {
+                    e.preventDefault();
+                    alert('Пожалуйста, выберите Полугодие для данного отчета.');
+                    return;
+                }
+
+                // (Опционально) 3. Проверка выбора хотя бы одного филиала
+                const selectedBranches = document.querySelectorAll('#branchesContainer input[name="SelectedBranchIds"]:checked');
+                if (selectedBranches.length === 0) {
+                    e.preventDefault();
+                    alert('Пожалуйста, выберите хотя бы один Филиал.');
+                    return;
+                }
+
+                // Если все проверки пройдены, форма отправляется
             });
 
             // --- Первоначальная инициализация ---

@@ -264,16 +264,10 @@ namespace Core.Services
             int sourceColIndex = 4;   // Столбец D
             int targetColIndex = 4;   // Столбец D
 
-            // >>> ГАРАНТИРОВАННАЯ ПРОВЕРКА ВЫЗОВА <<<
-            System.Diagnostics.Debug.WriteLine("---------------------------------------------------------");
-            System.Diagnostics.Debug.WriteLine("=== [SERVICE DEBUG] ProcessFixedStructureReport: ВЫЗВАН ===");
-            System.Diagnostics.Debug.WriteLine($"Количество файлов на входе: {filePaths?.Count ?? 0}");
-            System.Diagnostics.Debug.WriteLine("---------------------------------------------------------");
 
             // Если список файлов пуст, возвращаем пустой шаблон.
             if (filePaths == null || filePaths.Count == 0)
             {
-                System.Diagnostics.Debug.WriteLine("!!! [SERVICE DEBUG] Список файлов пуст. Возвращаем шаблон.");
                 using var tempMs = new MemoryStream();
                 resultWorkbook.SaveAs(tempMs);
                 return tempMs.ToArray();
@@ -281,11 +275,9 @@ namespace Core.Services
 
             foreach (var filePath in filePaths)
             {
-                System.Diagnostics.Debug.WriteLine($"--- [SERVICE DEBUG] Обрабатывается файл: {Path.GetFileName(filePath)} (Целевой столбец (число): {targetColIndex}) ---");
 
                 if (!File.Exists(filePath))
                 {
-                    System.Diagnostics.Debug.WriteLine($"!!! [SERVICE DEBUG] Файл не найден: {filePath}");
                     continue;
                 }
 
@@ -299,8 +291,6 @@ namespace Core.Services
                     var sourceCell = sourceWorksheet.Cell(row, sourceColIndex);
                     var sourceValue = sourceCell.Value;
 
-                    // Логируем считанное значение из исходной ячейки [Строка, Столбец D]
-                    System.Diagnostics.Debug.WriteLine($"[R{row}, C{sourceColIndex} (D)] Считанное значение: '{sourceValue}'");
 
                     if (!sourceValue.IsBlank)
                     {
@@ -314,7 +304,6 @@ namespace Core.Services
             }
 
             InsertPeriodDescription(resultWorkbook, year, month, null, null);
-            InsertSignature(resultWorkbook, signatureFilePath);
 
             // ЕДИНСТВЕННОЕ правильное место для объявления ms
             using var ms = new MemoryStream();
@@ -328,14 +317,33 @@ namespace Core.Services
             var worksheet = workbook.Worksheet(1); // Первый лист
             string periodText = GetPeriodText(year, month, quarter, halfYear);
 
-            // Найдем первую строку с текстом "Отчет о", и заменим/допишем
+            // Ищем ячейку, строка которой заканчивается на " за"
             var cell = worksheet.CellsUsed()
-            .FirstOrDefault(c => c.GetString().Trim().EndsWith(" за"));
+                .FirstOrDefault(c => c.GetString().Trim().EndsWith(" за"));
 
             if (cell != null)
             {
-                // Заменим текст
-                cell.Value = $"{cell.GetString().Split("за")[0].Trim()} за {periodText}";
+                string originalText = cell.GetString();
+                string targetSubstring = " за";
+
+                // Находим позицию ПОСЛЕДНЕГО вхождения " за"
+                // StringComparison.OrdinalIgnoreCase позволяет искать без учета регистра
+                int lastIndex = originalText.LastIndexOf(targetSubstring, StringComparison.OrdinalIgnoreCase);
+
+                if (lastIndex != -1)
+                {
+                    // 1. Берем часть строки ДО " за"
+                    string partBefore = originalText.Substring(0, lastIndex).Trim();
+
+                    // 2. Формируем новую строку
+                    cell.Value = $"{partBefore} за {periodText}";
+                }
+                else
+                {
+                    // Если " за" не найдено (хотя по условию поиска в FirstOrDefault должно быть),
+                    // можно просто добавить период в конец (или ничего не делать)
+                    cell.Value = $"{originalText} {periodText}";
+                }
             }
         }
 

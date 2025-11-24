@@ -26,26 +26,25 @@ namespace Core.Services
             _excelSplitter = excelSplitter;
             _webHostEnvironment = webHostEnvironment;
         }
-
         public async Task<List<Report>> GetReportsForSummaryAsync(
-            int templateId,
-            int year,
-            int? month,
-            int? quarter,
-            int? halfYear,
-            List<int> branchIds)
+    int templateId,
+    int year,
+    int? month,
+    int? quarter,
+    int? halfYear,
+    List<int> branchIds)
         {
             var template = await _unitOfWork.ReportTemplates.FindAsync(t => t.Id == templateId);
             if (template == null)
                 return new List<Report>();
 
             DateTime? startDate = null;
-            DateTime? endDate = null;
+            DateTime? endExclusiveDate = null; // Будет хранить дату начала СЛЕДУЮЩЕГО периода (эксклюзивно)
 
             if (year > 0)
             {
                 startDate = new DateTime(year, 1, 1);
-                endDate = new DateTime(year, 12, 31);
+                endExclusiveDate = new DateTime(year + 1, 1, 1); // По умолчанию - начало следующего года
 
                 switch (template.DeadlineType)
                 {
@@ -53,7 +52,9 @@ namespace Core.Services
                         if (month.HasValue)
                         {
                             startDate = new DateTime(year, month.Value, 1);
-                            endDate = new DateTime(year, month.Value, DateTime.DaysInMonth(year, month.Value));
+
+                            // Расчет начала следующего месяца
+                            endExclusiveDate = startDate.Value.AddMonths(1);
                         }
                         break;
 
@@ -61,9 +62,10 @@ namespace Core.Services
                         if (quarter.HasValue)
                         {
                             int startMonth = (quarter.Value - 1) * 3 + 1;
-                            int endMonth = startMonth + 2;
                             startDate = new DateTime(year, startMonth, 1);
-                            endDate = new DateTime(year, endMonth, DateTime.DaysInMonth(year, endMonth));
+
+                            // Расчет начала следующего квартала
+                            endExclusiveDate = startDate.Value.AddMonths(3);
                         }
                         break;
 
@@ -71,28 +73,103 @@ namespace Core.Services
                         if (halfYear.HasValue)
                         {
                             int startMonth = halfYear.Value == 1 ? 1 : 7;
-                            int endMonth = halfYear.Value == 1 ? 6 : 12;
                             startDate = new DateTime(year, startMonth, 1);
-                            endDate = new DateTime(year, endMonth, DateTime.DaysInMonth(year, endMonth));
+
+                            // Расчет начала следующего полугодия
+                            endExclusiveDate = startDate.Value.AddMonths(6);
                         }
                         break;
 
                     case DeadlineType.Yearly:
+                        // startDate = new DateTime(year, 1, 1); (Уже установлено)
+                        // endExclusiveDate = new DateTime(year + 1, 1, 1); (Уже установлено)
                         break;
                 }
+            }
+
+            // Если даты не установлены, или не удалось их вычислить, возвращаем пустой список
+            if (!startDate.HasValue || !endExclusiveDate.HasValue)
+            {
+                return new List<Report>();
             }
 
             var query = _unitOfWork.Reports.GetAll().AsQueryable()
                 .Where(r =>
                     r.TemplateId == templateId &&
-                    r.Period >= startDate &&
-                    r.Period <= endDate &&
+                    r.Period >= startDate.Value &&      // Период >= начало выбранного периода
+                    r.Period < endExclusiveDate.Value && // Период < начала СЛЕДУЮЩЕГО периода (РЕШЕНИЕ ПРОБЛЕМЫ)
                     r.BranchId.HasValue &&
                     branchIds.Contains(r.BranchId.Value));
 
             return await query.ToListAsync();
         }
+        /*
+                public async Task<List<Report>> GetReportsForSummaryAsync(
+                    int templateId,
+                    int year,
+                    int? month,
+                    int? quarter,
+                    int? halfYear,
+                    List<int> branchIds)
+                {
+                    var template = await _unitOfWork.ReportTemplates.FindAsync(t => t.Id == templateId);
+                    if (template == null)
+                        return new List<Report>();
 
+                    DateTime? startDate = null;
+                    DateTime? endDate = null;
+
+                    if (year > 0)
+                    {
+                        startDate = new DateTime(year, 1, 1);
+                        endDate = new DateTime(year, 12, 31);
+
+                        switch (template.DeadlineType)
+                        {
+                            case DeadlineType.Monthly:
+                                if (month.HasValue)
+                                {
+                                    startDate = new DateTime(year, month.Value, 1);
+                                    endDate = new DateTime(year, month.Value, DateTime.DaysInMonth(year, month.Value));
+                                }
+                                break;
+
+                            case DeadlineType.Quarterly:
+                                if (quarter.HasValue)
+                                {
+                                    int startMonth = (quarter.Value - 1) * 3 + 1;
+                                    int endMonth = startMonth + 2;
+                                    startDate = new DateTime(year, startMonth, 1);
+                                    endDate = new DateTime(year, endMonth, DateTime.DaysInMonth(year, endMonth));
+                                }
+                                break;
+
+                            case DeadlineType.HalfYearly:
+                                if (halfYear.HasValue)
+                                {
+                                    int startMonth = halfYear.Value == 1 ? 1 : 7;
+                                    int endMonth = halfYear.Value == 1 ? 6 : 12;
+                                    startDate = new DateTime(year, startMonth, 1);
+                                    endDate = new DateTime(year, endMonth, DateTime.DaysInMonth(year, endMonth));
+                                }
+                                break;
+
+                            case DeadlineType.Yearly:
+                                break;
+                        }
+                    }
+
+                    var query = _unitOfWork.Reports.GetAll().AsQueryable()
+                        .Where(r =>
+                            r.TemplateId == templateId &&
+                            r.Period >= startDate &&
+                            r.Period <= endDate &&
+                            r.BranchId.HasValue &&
+                            branchIds.Contains(r.BranchId.Value));
+
+                    return await query.ToListAsync();
+                }
+                */
         public Task<string> GetTemplateFilePathAsync(int templateId)
         {
             return _unitOfWork.ReportTemplates.FindAsync(t => t.Id == templateId).ContinueWith(t => t.Result.FilePath);
