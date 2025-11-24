@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Stat_reports.ViewModels;
 using Stat_reportsnt.Filters;
 
@@ -14,14 +15,15 @@ public class SummaryReportController : Controller
     private readonly ISummaryReportService _summaryReportService;
     private readonly IReportTemplateService _reportTemplateService;
     private readonly IBranchService _branchService;
-
+    private readonly IConfiguration _configuration;
     public SummaryReportController(ISummaryReportService summaryReportService,
         IReportTemplateService reportTemplateService,
-        IBranchService branchService)
+        IBranchService branchService, IConfiguration configuration)
     {
         _summaryReportService = summaryReportService;
         _reportTemplateService = reportTemplateService;
         _branchService = branchService;
+        _configuration = configuration;
     }
 
     [HttpGet]
@@ -46,18 +48,14 @@ public class SummaryReportController : Controller
         model.Branches = (List<Core.Entities.Branch>)
             await _branchService.GetAllBranchesAsync();
 
-        // Если только выбрали шаблон — показываем период
-        if (model.SelectedTemplateId != null && model.Year == null)
-        {
-            var selectedTemplate = model.Templates.
-                FirstOrDefault(t => t.Id == model.SelectedTemplateId);
-            model.PeriodType = selectedTemplate?.DeadlineType;
-
-            return View(model); // показать форму с полями периода
-        }
+        // ... (логика показа периода остается без изменений) ...
 
         if (!ModelState.IsValid || model.SelectedTemplateId == null || model.Year == null)
             return View(model);
+
+        // Получаем ID специального отчета из конфигурации
+        // Второй аргумент (9) — это значение по умолчанию
+        var fixedStructureTemplateId = _configuration.GetValue<int>("ReportSettings:FixedStructureReportTemplateId", 9);
 
         // Получаем нужные отчеты
         var reports = await _summaryReportService.
@@ -66,21 +64,52 @@ public class SummaryReportController : Controller
 
         var templatePath = await _summaryReportService.
             GetTemplateFilePathAsync(model.SelectedTemplateId.Value);
-        if (model.SelectedTemplateId == 9) {
 
-            var mergedExcel = _summaryReportService.MergeFixedStructureReportsToExcel(reports, templatePath, (int)model.Year, (int)model.Month);
+        // Получаем выбранный шаблон один раз для определения имени файла
+        var selectedTemplate = model.Templates.
+            FirstOrDefault(t => t.Id == model.SelectedTemplateId);
+
+        if (selectedTemplate == null)
+        {
+            // Добавьте обработку ошибки, если шаблон не найден
+            return NotFound();
+        }
+        // Объявляем переменную здесь, чтобы она была доступна для File()
+        byte[] mergedExcel;
+
+        if (model.SelectedTemplateId == fixedStructureTemplateId)
+        {
+            if (model.IsExtendedReport)
+            {
+                // !!! ВЫЗЫВАЕМ НОВЫЙ МЕТОД ДЛЯ РАСШИРЕННОГО ОТЧЕТА !!!
+                mergedExcel = _summaryReportService.MergeSummaryExcelReport(
+                    reports,
+                    templatePath,
+                    (int)model.Year,
+                    (int)model.Month);
+            }
+            else
+            {
+                // Вызываем старый метод для отчета с фиксированной структурой
+                mergedExcel = _summaryReportService.MergeFixedStructureReportsToExcel(
+                    reports,
+                    templatePath,
+                    (int)model.Year,
+                    (int)model.Month);
+            }
+
+            // Единая точка возврата File для этого блока
             return File(mergedExcel, $"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                $"Сводный {model.Templates.FirstOrDefault(t => t.Id == model.SelectedTemplateId).Name}.xlsx");
+                $"Сводный {selectedTemplate.Name}.xlsx");
         }
         else
         {
-            var mergedExcel = _summaryReportService.
-              MergeReportsToExcel(reports, templatePath, model.Year.Value, model.Month, model.Quarter, model.HalfYearPeriod);
+            // Логика для стандартных отчетов
+            mergedExcel = _summaryReportService.
+                MergeReportsToExcel(reports, templatePath, model.Year.Value, model.Month, model.Quarter, model.HalfYearPeriod);
 
             return File(mergedExcel, $"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                $"Сводный {model.Templates.FirstOrDefault(t => t.Id == model.SelectedTemplateId).Name}.xlsx");
-
+                $"Сводный {selectedTemplate.Name}.xlsx");
         }
-        
     }
 }

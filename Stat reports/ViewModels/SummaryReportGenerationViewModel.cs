@@ -14,7 +14,7 @@ namespace Stat_reports.ViewModels
         public int? Month { get; set; }           // для месячного
         public int? Quarter { get; set; }         // для квартального
         public int? HalfYearPeriod { get; set; }  // 1 или 2
-
+        public bool IsExtendedReport { get; set; }
         public List<int> SelectedBranchIds { get; set; } = new List<int>();
 
         public List<ReportTemplate> Templates { get; set; } = new List<ReportTemplate>();

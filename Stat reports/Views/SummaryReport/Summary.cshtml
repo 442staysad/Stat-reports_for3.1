@@ -84,11 +84,19 @@
             {
                 <option value="@t.Id"
                         data-period-type="@t.DeadlineType"
-                        data-report-type="@t.Type">
+                        data-report-type="@t.Type"
+                        data-is-special="@(t.Id == 9 ? "true" : "false")">
                     @t.Name
                 </option>
             }
         </select>
+    </div>
+
+    <div id="extendedReportOption" class="mb-3 form-check" style="display: none;">
+        <input asp-for="IsExtendedReport" class="form-check-input" type="checkbox" id="IsExtendedReport">
+        <label class="form-check-label" for="IsExtendedReport">
+            Расширенный отчет
+        </label>
     </div>
 
     
@@ -160,9 +168,18 @@
 
 @section Scripts {
     <script>
+        // Используем константу для ID специального отчета.
+        // В идеале, это значение должно приходить из Razor (например, @ViewBag.FixedStructureTemplateId).
+        // Для примера используем 9.
+        const FIXED_REPORT_ID = '9';
+
         document.addEventListener('DOMContentLoaded', function() {
             // --- Элементы управления ---
             const templateSelect = document.getElementById('templateSelect');
+            // !!! ДОБАВЛЕН ЭЛЕМЕНТ !!!
+            const extendedOptionGroup = document.getElementById('extendedReportOption');
+            const extendedCheckbox = document.getElementById('IsExtendedReport');
+
             const yearInput = document.querySelector('input[name="Year"]');
             const monthSelect = document.querySelector('select[name="Month"]');
             const quarterSelect = document.querySelector('select[name="Quarter"]');
@@ -197,6 +214,8 @@
                 branchesLoader.style.display = 'block';
                 branchesContainer.style.display = 'none';
 
+                // NOTE: Нам не нужно передавать IsExtendedReport в GetBranchesWithAcceptedReports,
+                // так как это влияет только на генерацию конечного отчета, а не на доступность филиалов.
                 const url = `/ReportMvc/GetBranchesWithAcceptedReports?templateId=${templateId}&year=${year}&month=${month}&quarter=${quarter}&halfYear=${halfYear}`;
 
                 try {
@@ -233,7 +252,7 @@
                 }
             }
 
-            // --- Логика для управления UI (фильтрация шаблонов, показ полей периода) ---
+            // --- Логика для управления UI (фильтрация шаблонов) ---
             const reportTypeTabs = document.querySelectorAll('#reportTypeTabs .nav-link');
 
             function filterTemplatesByType(reportType) {
@@ -248,22 +267,34 @@
                 }
             }
 
-            function updatePeriodFields() {
+            // --- Функция для обновления видимости полей периода и чекбокса ---
+            function updateFormVisibility() {
                 const selectedOption = templateSelect.selectedOptions[0];
                 const periodType = selectedOption ? selectedOption.getAttribute('data-period-type') : null;
+                // Читаем, является ли выбранный шаблон "особенным" (fixed ID)
+                const isSpecialReport = selectedOption ? selectedOption.getAttribute('data-is-special') === 'true' : false;
 
+                // 1. Управление видимостью полей периода
                 yearGroup.style.display = 'none';
                 monthGroup.style.display = 'none';
                 quarterGroup.style.display = 'none';
                 halfGroup.style.display = 'none';
 
-                if (!periodType) return;
+                if (periodType) {
+                    yearGroup.style.display = 'block';
+                    switch(periodType) {
+                        case 'Monthly': monthGroup.style.display = 'block'; break;
+                        case 'Quarterly': quarterGroup.style.display = 'block'; break;
+                        case 'HalfYearly': halfGroup.style.display = 'block'; break;
+                    }
+                }
 
-                yearGroup.style.display = 'block';
-                switch(periodType) {
-                    case 'Monthly': monthGroup.style.display = 'block'; break;
-                    case 'Quarterly': quarterGroup.style.display = 'block'; break;
-                    case 'HalfYearly': halfGroup.style.display = 'block'; break;
+                // 2. Управление видимостью чекбокса "Расширенный отчет"
+                if (isSpecialReport) {
+                    extendedOptionGroup.style.display = 'block';
+                } else {
+                    extendedOptionGroup.style.display = 'none';
+                    extendedCheckbox.checked = false; // Сбросить значение, если скрываем
                 }
             }
 
@@ -275,13 +306,13 @@
 
                     // Сбросить шаблон и обновить поля
                     templateSelect.value = '';
-                    updatePeriodFields();
 
                     // Сброс значений периода при смене вкладки
                     monthSelect.value = '';
                     quarterSelect.value = '';
                     halfYearSelect.value = '';
 
+                    updateFormVisibility(); // Обновляем видимость полей и чекбокса
                     updateAvailableBranches(); // Обновить филиалы
                 });
             });
@@ -293,7 +324,7 @@
                 quarterSelect.value = '';
                 halfYearSelect.value = '';
 
-                updatePeriodFields();
+                updateFormVisibility(); // Обновляем видимость полей и чекбокса
                 updateAvailableBranches();
             });
 
@@ -316,11 +347,9 @@
                 });
             });
 
-            // --- ГЛАВНОЕ ИЗМЕНЕНИЕ: Обработчик отправки формы с клиентской валидацией ---
+            // --- Обработчик отправки формы с клиентской валидацией ---
             document.getElementById('summaryForm').addEventListener('submit', function (e) {
                 const templateId = templateSelect.value;
-                const selectedOption = templateSelect.selectedOptions[0];
-                const periodType = selectedOption ? selectedOption.getAttribute('data-period-type') : null;
 
                 // 1. Проверка выбранного шаблона
                 if (!templateId) {
@@ -360,13 +389,14 @@
                     return;
                 }
 
-                // Если все проверки пройдены, форма отправляется
+                // Если все проверки пройдены, форма отправляется.
+                // Значение IsExtendedReport будет автоматически передано, так как input находится в форме.
             });
 
             // --- Первоначальная инициализация ---
             const initialReportType = document.querySelector('#reportTypeTabs .nav-link.active').getAttribute('data-report-type');
             filterTemplatesByType(initialReportType || '');
-            updatePeriodFields();
+            updateFormVisibility();
             updateAvailableBranches(); // Вызываем один раз при загрузке, чтобы показать начальное сообщение
         });
     </script>

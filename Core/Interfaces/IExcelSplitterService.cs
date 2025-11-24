@@ -10,5 +10,6 @@ namespace Core.Interfaces
     {
         byte[] ProcessReports(List<string> filePaths, string templatePath, int year, int? month, int? quarter, int? halfYear, string signatureFilePath);
         byte[] ProcessFixedStructureReport(List<string> filePaths, string templatePath, int year, int month, string signatureFilePath);
+        byte[] ProcessSummaryExcelReport(List<string> filePaths, string templatePath, int year, int month, string signatureFilePath);
     }
 }

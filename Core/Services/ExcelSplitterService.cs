@@ -311,6 +311,64 @@ namespace Core.Services
             return ms.ToArray();
         }
 
+        public byte[] ProcessSummaryExcelReport(
+            List<string> filePaths,
+            string templatePath,
+            int year,
+            int month,
+            string signatureFilePath)
+        {
+            using var resultWorkbook = new XLWorkbook(templatePath);
+            var targetWorksheet = resultWorkbook.Worksheet(1);
+
+            int startRow = 2;
+            int endRow = 48;
+            int sourceColIndex = 4;  // Столбец D
+            int targetColIndex = 4;  // Столбец D (первый столбец для данных)
+
+            // Если список файлов пуст, вернуть пустой шаблон
+            if (filePaths == null || filePaths.Count == 0)
+            {
+                using var tempMs = new MemoryStream();
+                resultWorkbook.SaveAs(tempMs);
+                return tempMs.ToArray();
+            }
+
+            foreach (var filePath in filePaths)
+            {
+                if (!File.Exists(filePath))
+                    continue;
+
+                using var sourceWorkbook = new XLWorkbook(filePath);
+                var sourceWorksheet = sourceWorkbook.Worksheet(1);
+
+                if (sourceWorksheet == null)
+                    continue;
+
+                for (int row = startRow; row <= endRow; row++)
+                {
+                    var sourceCell = sourceWorksheet.Cell(row, sourceColIndex);
+                    var sourceValue = sourceCell.Value;
+
+                    if (!sourceValue.IsBlank)
+                    {
+                        var targetCell = targetWorksheet.Cell(row, targetColIndex);
+                        targetCell.Value = sourceValue;
+                        targetCell.Style = sourceCell.Style;
+                    }
+                }
+
+                // >>>>>>> Единственное отличие от ProcessFixedStructureReport <<<<<<<
+                targetColIndex += 2;
+            }
+
+            InsertPeriodDescription(resultWorkbook, year, month, null, null);
+
+            using var ms = new MemoryStream();
+            resultWorkbook.SaveAs(ms);
+            return ms.ToArray();
+        }
+
 
         private void InsertPeriodDescription(IXLWorkbook workbook, int year, int? month, int? quarter, int? halfYear)
         {

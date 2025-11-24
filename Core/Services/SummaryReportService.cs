@@ -218,6 +218,27 @@ namespace Core.Services
             );
         }
 
+        // Новый метод для Сводного/Расширенного отчета (использует ProcessSummaryExcelReport)
+        public byte[] MergeSummaryExcelReport(List<Report> reports, string templatePath, int year, int month)
+        {
+            // 1. Собираем пути к файлам отчетов
+            var paths = reports.Select(r => r.FilePath).ToList();
+
+            // 2. Путь к файлу подписи
+            string wwwRootPath = _webHostEnvironment.WebRootPath;
+            string signatureFilePath = Path.Combine(wwwRootPath, "docs", "Подпись.xlsx");
+
+            // 3. Вызываем новый специальный метод в сплиттере
+            // Этот метод реализует логику "через одну ячейку" (С, Е, G...)
+            return _excelSplitter.ProcessSummaryExcelReport(
+                paths,
+                templatePath,
+                year,
+                month,
+                signatureFilePath
+            );
+        }
+
         private List<int> GetQuarterMonths(int quarter)
         {
             return quarter switch

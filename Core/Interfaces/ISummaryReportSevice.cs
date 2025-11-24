@@ -12,5 +12,6 @@ namespace Core.Interfaces
         Task<string> GetTemplateFilePathAsync(int templateId);
         byte[] MergeReportsToExcel(List<Report> reports, string templatePath, int year, int? month, int? quarter, int? halfYear);
         byte[] MergeFixedStructureReportsToExcel(List<Report> reports, string templatePath, int year, int month);
+        byte[] MergeSummaryExcelReport(List<Report> reports, string templatePath, int year, int month);
     }
 }
