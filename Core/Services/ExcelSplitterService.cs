@@ -303,6 +303,24 @@ namespace Core.Services
                 targetColIndex++;
             }
 
+
+            // --- НОВАЯ ЛОГИКА: УСТАНОВКА ГРАНИЦ ДЛЯ ВСЕЙ ОБЛАСТИ ДАННЫХ ---
+
+            // Последний заполненный столбец - это targetColIndex - 1, 
+            // поскольку targetColIndex указывает на следующий свободный столбец.
+            int lastFilledCol = targetColIndex - 1;
+            int firstCol = 1; // Столбец А
+
+            // Создаем диапазон, например, от A2 до (последний столбец)48
+            var fullRangeWithBorders = targetWorksheet.Range(startRow, firstCol, endRow, lastFilledCol);
+
+            // Устанавливаем тонкие границы для всего диапазона (снаружи и внутри)
+            fullRangeWithBorders.Style.Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+            fullRangeWithBorders.Style.Border.SetInsideBorder(XLBorderStyleValues.Thin);
+
+            // --- КОНЕЦ НОВОЙ ЛОГИКИ ---
+
+
             InsertPeriodDescription(resultWorkbook, year, month, null, null);
 
             // ЕДИНСТВЕННОЕ правильное место для объявления ms
@@ -318,13 +336,19 @@ namespace Core.Services
             int month,
             string signatureFilePath)
         {
+            // Предполагается, что у вас есть using ClosedXML.Excel;
             using var resultWorkbook = new XLWorkbook(templatePath);
             var targetWorksheet = resultWorkbook.Worksheet(1);
 
-            int startRow = 2;
-            int endRow = 48;
-            int sourceColIndex = 4;  // Столбец D
-            int targetColIndex = 4;  // Столбец D (первый столбец для данных)
+            int startRow = 2;  // Строка заголовка / начала данных
+            int endRow = 48;   // Строка знаменателя
+            int sourceColIndex = 4; // Столбец D в исходном отчете
+
+            // Переменная для отслеживания текущего столбца вставки данных
+            int currentTargetColIndex = 4;
+
+            // Список для сохранения индексов столбцов, куда были вставлены данные (D, F, H, ...)
+            var dataColumnIndexes = new List<int>();
 
             // Если список файлов пуст, вернуть пустой шаблон
             if (filePaths == null || filePaths.Count == 0)
@@ -345,22 +369,114 @@ namespace Core.Services
                 if (sourceWorksheet == null)
                     continue;
 
+                // !!! Запоминаем индекс столбца с данными, перед тем как его сдвинуть !!!
+                dataColumnIndexes.Add(currentTargetColIndex);
+
+                // 1. Копирование данных
                 for (int row = startRow; row <= endRow; row++)
                 {
                     var sourceCell = sourceWorksheet.Cell(row, sourceColIndex);
                     var sourceValue = sourceCell.Value;
 
-                    if (!sourceValue.IsBlank)
+                    // Копируем значение и стиль, включая заголовок (R2) и знаменатель (R48)
+                    if (!sourceValue.IsBlank || row == startRow)
                     {
-                        var targetCell = targetWorksheet.Cell(row, targetColIndex);
+                        var targetCell = targetWorksheet.Cell(row, currentTargetColIndex);
                         targetCell.Value = sourceValue;
                         targetCell.Style = sourceCell.Style;
                     }
                 }
 
-                // >>>>>>> Единственное отличие от ProcessFixedStructureReport <<<<<<<
-                targetColIndex += 2;
+                // 2. Вставка заголовка и формул в следующий столбец (проценты)
+                int dataCol = currentTargetColIndex;
+                int formulaCol = currentTargetColIndex + 1; // Столбец для формул (E, G, I, ...)
+
+                // Установка ширины столбца для процентов
+                targetWorksheet.Column(formulaCol).Width = 12;
+
+                // Получаем значение заголовка из текущего столбца данных (R2)
+                var dataHeaderCell = targetWorksheet.Cell(startRow, dataCol);
+                var formulaHeaderCell = targetWorksheet.Cell(startRow, formulaCol);
+
+                // Копируем текст и добавляем "%"
+                formulaHeaderCell.Value = $"{dataHeaderCell.GetText()} %";
+
+                // Копируем стиль заголовка (шрифт, цвет и т.д.)
+                formulaHeaderCell.Style = dataHeaderCell.Style;
+
+                // Получаем букву столбца, куда были скопированы данные (D, F, H, ...)
+                string dataColLetter = ClosedXML.Excel.XLHelper.GetColumnLetterFromNumber(dataCol);
+
+                // --- Диапазоны 3-47 с формулами SUM/D48 ---
+                string formula1 = $"=SUM({dataColLetter}3:{dataColLetter}14)/{dataColLetter}48";
+                targetWorksheet.Range(3, formulaCol, 14, formulaCol).Merge();
+                targetWorksheet.Cell(3, formulaCol).FormulaA1 = formula1;
+
+                string formula2 = $"=SUM({dataColLetter}15:{dataColLetter}21)/{dataColLetter}48";
+                targetWorksheet.Range(15, formulaCol, 21, formulaCol).Merge();
+                targetWorksheet.Cell(15, formulaCol).FormulaA1 = formula2;
+
+                string formula3 = $"=SUM({dataColLetter}22:{dataColLetter}47)/{dataColLetter}48";
+                targetWorksheet.Range(22, formulaCol, 47, formulaCol).Merge();
+                targetWorksheet.Cell(22, formulaCol).FormulaA1 = formula3;
+
+                // Применение форматирования
+                var formulaRange = targetWorksheet.Range(3, formulaCol, 47, formulaCol);
+                formulaRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                formulaRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                formulaRange.Style.NumberFormat.Format = "0.00%";
+
+                // 3. Переход к следующему столбцу для данных (пропускаем столбец с формулами)
+                currentTargetColIndex += 2;
             }
+
+            // --- ЛОГИКА: ФОРМУЛЫ СУММИРОВАНИЯ В СТОЛБЦЕ B ---
+
+            int startDataRow = 3;
+            int endDataRowForSum = 47;
+            int targetSumCol = 2; // Столбец B
+
+            for (int row = startDataRow; row <= endDataRowForSum; row++)
+            {
+                var formulaParts = dataColumnIndexes
+                    .Select(colIndex => ClosedXML.Excel.XLHelper.GetColumnLetterFromNumber(colIndex) + row)
+                    .ToList();
+
+                string sumFormula = $"=SUM({string.Join(",", formulaParts)})";
+
+                var targetCell = targetWorksheet.Cell(row, targetSumCol);
+                targetCell.FormulaA1 = sumFormula;
+                targetCell.Style = targetWorksheet.Cell(row, 1).Style;
+                // УСТАНОВКА ШРИФТА 14
+                targetCell.Style.Font.FontSize = 14;
+            }
+
+            // Добавляем формулу для знаменателя (B48)
+            var denominatorFormulaParts = dataColumnIndexes
+                .Select(colIndex => ClosedXML.Excel.XLHelper.GetColumnLetterFromNumber(colIndex) + endRow)
+                .ToList();
+
+            string denominatorSumFormula = $"=SUM({string.Join(",", denominatorFormulaParts)})";
+            targetWorksheet.Cell(endRow, targetSumCol).FormulaA1 = denominatorSumFormula;
+            targetWorksheet.Cell(endRow, targetSumCol).Style = targetWorksheet.Cell(endRow, 1).Style;
+
+
+            // --- НОВАЯ ЛОГИКА: УСТАНОВКА ГРАНИЦ ДЛЯ ВСЕЙ ОБЛАСТИ ДАННЫХ ---
+
+            // Последний заполненный столбец - это столбец с процентами последнего отчета,
+            // который находится перед текущим (незаполненным) currentTargetColIndex.
+            int lastFilledCol = currentTargetColIndex - 1;
+            int firstCol = 1; // Столбец А
+
+            // Создаем диапазон, например, от A2 до H48
+            var fullRangeWithBorders = targetWorksheet.Range(startRow, firstCol, endRow, lastFilledCol);
+
+            // Устанавливаем тонкие границы для всего диапазона (снаружи и внутри)
+            fullRangeWithBorders.Style.Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+            fullRangeWithBorders.Style.Border.SetInsideBorder(XLBorderStyleValues.Thin);
+
+            // --- КОНЕЦ НОВОЙ ЛОГИКИ ---
+
 
             InsertPeriodDescription(resultWorkbook, year, month, null, null);
 
@@ -410,7 +526,7 @@ namespace Core.Services
             if (month != null)
             {
                 string monthName = CultureInfo.GetCultureInfo("ru-RU").DateTimeFormat.GetMonthName(month.Value);
-                return $"{monthName} {year}";
+                return $"{monthName.ToLower()} {year}";
             }
             else if (quarter != null)
             {
