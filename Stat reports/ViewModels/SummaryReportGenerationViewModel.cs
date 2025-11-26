@@ -15,6 +15,7 @@ namespace Stat_reports.ViewModels
         public int? Quarter { get; set; }         // для квартального
         public int? HalfYearPeriod { get; set; }  // 1 или 2
         public bool IsExtendedReport { get; set; }
+        public List<int> SelectedRowIndexes { get; set; } // Получит 6 чисел: [Start1, End1, Start2, End2, Start3, End3]
         public List<int> SelectedBranchIds { get; set; } = new List<int>();
 
         public List<ReportTemplate> Templates { get; set; } = new List<ReportTemplate>();

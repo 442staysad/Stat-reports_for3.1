@@ -39,7 +39,7 @@ public class SummaryReportController : Controller
 
         return View(model);
     }
-
+    //как же мне она надоела эта тупая назойливая самовлюбленная начальница
     [HttpPost]
     public async Task<IActionResult> Summary(SummaryReportGenerationViewModel model)
     {
@@ -48,7 +48,6 @@ public class SummaryReportController : Controller
         model.Branches = (List<Core.Entities.Branch>)
             await _branchService.GetAllBranchesAsync();
 
-        // ... (логика показа периода остается без изменений) ...
 
         if (!ModelState.IsValid || model.SelectedTemplateId == null || model.Year == null)
             return View(model);
@@ -81,13 +80,14 @@ public class SummaryReportController : Controller
         {
             if (model.IsExtendedReport)
             {
-                // !!! ВЫЗЫВАЕМ НОВЫЙ МЕТОД ДЛЯ РАСШИРЕННОГО ОТЧЕТА !!!
-                mergedExcel = _summaryReportService.MergeSummaryExcelReport(
+                // !!! ВЫЗЫВАЕМ НОВЫЙ МЕТОД ДЛЯ РАСШИРЕННОГО ОТЧЕТА !!!
+                mergedExcel = _summaryReportService.MergeSummaryExcelReport(
                     reports,
                     templatePath,
                     (int)model.Year,
-                    (int)model.Month);
-            }
+                    (int)model.Month,
+                    model.SelectedRowIndexes); // <-- ДОБАВЛЕНО: ПЕРЕДАЕМ ВЫБРАННЫЕ ДИАПАЗОНЫ
+                    }
             else
             {
                 // Вызываем старый метод для отчета с фиксированной структурой
@@ -95,7 +95,7 @@ public class SummaryReportController : Controller
                     reports,
                     templatePath,
                     (int)model.Year,
-                    (int)model.Month);
+                    (int)model.Month,model.SelectedRowIndexes);
             }
 
             // Единая точка возврата File для этого блока

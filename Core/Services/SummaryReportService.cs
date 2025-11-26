@@ -197,7 +197,11 @@ namespace Core.Services
 
         // --- НОВЫЙ МЕТОД ---
         // Для отчета с фиксированной структурой (копирование столбцов)
-        public byte[] MergeFixedStructureReportsToExcel(List<Report> reports, string templatePath, int year, int month)
+        public byte[] MergeFixedStructureReportsToExcel(List<Report> reports,
+            string templatePath, 
+            int year, 
+            int month,
+            List<int> rowRanges)
         {
 
             // 1. Собираем пути к файлам отчетов
@@ -214,12 +218,12 @@ namespace Core.Services
                 templatePath,
                 year,
                 month,
-                signatureFilePath
+                signatureFilePath, rowRanges
             );
         }
 
         // Новый метод для Сводного/Расширенного отчета (использует ProcessSummaryExcelReport)
-        public byte[] MergeSummaryExcelReport(List<Report> reports, string templatePath, int year, int month)
+        public byte[] MergeSummaryExcelReport(List<Report> reports, string templatePath, int year, int month, List<int> selectedRowIndexes)
         {
             // 1. Собираем пути к файлам отчетов
             var paths = reports.Select(r => r.FilePath).ToList();
@@ -235,7 +239,7 @@ namespace Core.Services
                 templatePath,
                 year,
                 month,
-                signatureFilePath
+                signatureFilePath, selectedRowIndexes
             );
         }
 

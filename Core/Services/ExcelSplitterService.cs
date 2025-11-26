@@ -254,16 +254,24 @@ namespace Core.Services
             }
         }
 
-        public byte[] ProcessFixedStructureReport(List<string> filePaths, string templatePath, int year, int month, string signatureFilePath)
+        public byte[] ProcessFixedStructureReport(
+                    List<string> filePaths,
+                    string templatePath,
+                    int year,
+                    int month,
+                    string signatureFilePath,
+                    List<int> rowRanges) // <--- НОВЫЙ ПАРАМЕТР
         {
             using var resultWorkbook = new XLWorkbook(templatePath);
             var targetWorksheet = resultWorkbook.Worksheet(1);
 
             int startRow = 2;
             int endRow = 48;
-            int sourceColIndex = 4;   // Столбец D
-            int targetColIndex = 4;   // Столбец D
+            int sourceColIndex = 4;   // Столбец D в исходном отчете
+            int currentTargetColIndex = 4;   // Столбец D в целевом отчете (для данных из файлов)
 
+            // Список для сохранения индексов столбцов, куда были вставлены данные (D, E, F, ...)
+            var dataColumnIndexes = new List<int>();
 
             // Если список файлов пуст, возвращаем пустой шаблон.
             if (filePaths == null || filePaths.Count == 0)
@@ -272,19 +280,40 @@ namespace Core.Services
                 resultWorkbook.SaveAs(tempMs);
                 return tempMs.ToArray();
             }
+            // --- ЛОГИКА: ОБРАБОТКА ДИАПАЗОНОВ (ДИНАМИЧЕСКИЙ СПИСОК) ---
+            var ranges = new List<(int Start, int End)>();
+
+            // Проверяем, что количество индексов четное (Start и End для каждой группы)
+            if (rowRanges != null && rowRanges.Count > 0 && rowRanges.Count % 2 == 0)
+            {
+                // Группируем индексы попарно
+                for (int i = 0; i < rowRanges.Count; i += 2)
+                {
+                    ranges.Add((rowRanges[i], rowRanges[i + 1]));
+                }
+            }
+
+            // Если данные некорректны или пусты, используем фиксированные 3 диапазона по умолчанию
+            if (ranges.Count == 0)
+            {
+                ranges.Add((3, 14));
+                ranges.Add((15, 21));
+                ranges.Add((22, 47));
+            }
+            // ------------------------------------------
+
 
             foreach (var filePath in filePaths)
             {
-
-                if (!File.Exists(filePath))
-                {
-                    continue;
-                }
+                if (!File.Exists(filePath)) continue;
 
                 using var sourceWorkbook = new XLWorkbook(filePath);
                 var sourceWorksheet = sourceWorkbook.Worksheet(1);
 
                 if (sourceWorksheet == null) continue;
+
+                // !!! Запоминаем индекс столбца с данными !!!
+                dataColumnIndexes.Add(currentTargetColIndex);
 
                 for (int row = startRow; row <= endRow; row++)
                 {
@@ -292,29 +321,97 @@ namespace Core.Services
                     var sourceValue = sourceCell.Value;
 
 
-                    if (!sourceValue.IsBlank)
+                    if (!sourceValue.IsBlank || row == startRow) // Копируем и заголовок
                     {
-                        var targetCell = targetWorksheet.Cell(row, targetColIndex);
+                        var targetCell = targetWorksheet.Cell(row, currentTargetColIndex);
                         targetCell.Value = sourceValue;
                         targetCell.Style = sourceCell.Style;
                     }
                 }
 
-                targetColIndex++;
+                currentTargetColIndex++; // Переход к следующему столбцу (D -> E -> F, ...)
             }
 
+            // --- ЛОГИКА: ФОРМУЛЫ СУММИРОВАНИЯ В СТОЛБЦЕ B (Сумма по филиалам) ---
+
+            int startDataRow = 3;
+            int endDataRowForSum = 47;
+            int targetSumColB = 2; // Столбец B
+            string denominatorCellB48 = $"B{endRow}"; // B48
+
+            for (int row = startDataRow; row <= endDataRowForSum; row++)
+            {
+                var formulaParts = dataColumnIndexes
+                    .Select(colIndex => ClosedXML.Excel.XLHelper.GetColumnLetterFromNumber(colIndex) + row)
+                    .ToList();
+
+                string sumFormula = $"=SUM({string.Join(",", formulaParts)})";
+
+                var targetCell = targetWorksheet.Cell(row, targetSumColB);
+                targetCell.FormulaA1 = sumFormula;
+                targetCell.Style = targetWorksheet.Cell(row, 1).Style;
+                targetCell.Style.Font.FontSize = 14;
+            }
+
+            // Добавляем формулу для знаменателя (B48)
+            var denominatorFormulaParts = dataColumnIndexes
+                .Select(colIndex => ClosedXML.Excel.XLHelper.GetColumnLetterFromNumber(colIndex) + endRow)
+                .ToList();
+
+            string denominatorSumFormula = $"=SUM({string.Join(",", denominatorFormulaParts)})";
+            targetWorksheet.Cell(endRow, targetSumColB).FormulaA1 = denominatorSumFormula;
+            targetWorksheet.Cell(endRow, targetSumColB).Style = targetWorksheet.Cell(endRow, 1).Style;
+
+            // --- НОВАЯ ЛОГИКА: ФОРМУЛЫ СУММИРОВАНИЯ ДИАПАЗОНОВ В СТОЛБЦЕ C (ПРОЦЕНТЫ) ---
+
+            int targetRangeSumColC = 3; // Столбец C
+            string sourceColLetterB = ClosedXML.Excel.XLHelper.GetColumnLetterFromNumber(targetSumColB); // "B"
+
+            // Заголовок столбца C
+            var headerCellC = targetWorksheet.Cell(startRow, targetRangeSumColC);
+            headerCellC.Value = "% от Свода";
+            headerCellC.Style = targetWorksheet.Cell(startRow, targetSumColB).Style;
+
+            // Установка ширины столбца C
+            targetWorksheet.Column(targetRangeSumColC).Width = 12;
+
+            foreach (var range in ranges)
+            {
+                int startRange = range.Start;
+                int endRange = range.End;
+
+                // !!! ФОРМУЛА С ДЕЛЕНИЕМ НА B48 !!!
+                // Формула: =SUM(B_startRange:B_endRange)/B48
+                string formula = $"=SUM({sourceColLetterB}{startRange}:{sourceColLetterB}{endRange})/{denominatorCellB48}";
+
+                // Объединяем ячейки в диапазоне в столбце C
+                var mergedRange = targetWorksheet.Range(startRange, targetRangeSumColC, endRange, targetRangeSumColC);
+                mergedRange.Merge();
+
+                // Устанавливаем формулу в первую ячейку объединенного диапазона
+                targetWorksheet.Cell(startRange, targetRangeSumColC).FormulaA1 = formula;
+
+                // Копируем стиль из столбца B и центрируем
+                var baseStyle = targetWorksheet.Cell(startRange, targetSumColB).Style;
+
+                mergedRange.Style.Font = baseStyle.Font;
+                mergedRange.Style.Fill = baseStyle.Fill;
+                mergedRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                mergedRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+                // !!! ФОРМАТИРОВАНИЕ В ПРОЦЕНТЫ !!!
+                mergedRange.Style.NumberFormat.Format = "0.00%";
+            }
+
+            // Добавляем формулу для знаменателя (C48), которая должна быть 100%
 
             // --- НОВАЯ ЛОГИКА: УСТАНОВКА ГРАНИЦ ДЛЯ ВСЕЙ ОБЛАСТИ ДАННЫХ ---
 
-            // Последний заполненный столбец - это targetColIndex - 1, 
-            // поскольку targetColIndex указывает на следующий свободный столбец.
-            int lastFilledCol = targetColIndex - 1;
+            int lastFilledCol = currentTargetColIndex - 1;
             int firstCol = 1; // Столбец А
 
-            // Создаем диапазон, например, от A2 до (последний столбец)48
             var fullRangeWithBorders = targetWorksheet.Range(startRow, firstCol, endRow, lastFilledCol);
 
-            // Устанавливаем тонкие границы для всего диапазона (снаружи и внутри)
             fullRangeWithBorders.Style.Border.SetOutsideBorder(XLBorderStyleValues.Thin);
             fullRangeWithBorders.Style.Border.SetInsideBorder(XLBorderStyleValues.Thin);
 
@@ -323,7 +420,6 @@ namespace Core.Services
 
             InsertPeriodDescription(resultWorkbook, year, month, null, null);
 
-            // ЕДИНСТВЕННОЕ правильное место для объявления ms
             using var ms = new MemoryStream();
             resultWorkbook.SaveAs(ms);
             return ms.ToArray();
@@ -334,7 +430,7 @@ namespace Core.Services
             string templatePath,
             int year,
             int month,
-            string signatureFilePath)
+            string signatureFilePath, List<int> rowRanges)
         {
             // Предполагается, что у вас есть using ClosedXML.Excel;
             using var resultWorkbook = new XLWorkbook(templatePath);
@@ -356,6 +452,26 @@ namespace Core.Services
                 using var tempMs = new MemoryStream();
                 resultWorkbook.SaveAs(tempMs);
                 return tempMs.ToArray();
+            }
+            // --- ЛОГИКА: ОБРАБОТКА ДИАПАЗОНОВ (ДИНАМИЧЕСКИЙ СПИСОК) ---
+            var ranges = new List<(int Start, int End)>();
+
+            // Проверяем, что количество индексов четное (Start и End для каждой группы)
+            if (rowRanges != null && rowRanges.Count > 0 && rowRanges.Count % 2 == 0)
+            {
+                // Группируем индексы попарно
+                for (int i = 0; i < rowRanges.Count; i += 2)
+                {
+                    ranges.Add((rowRanges[i], rowRanges[i + 1]));
+                }
+            }
+
+            // Если данные некорректны или пусты, используем фиксированные 3 диапазона по умолчанию
+            if (ranges.Count == 0)
+            {
+                ranges.Add((3, 14));
+                ranges.Add((15, 21));
+                ranges.Add((22, 47));
             }
 
             foreach (var filePath in filePaths)
@@ -408,33 +524,44 @@ namespace Core.Services
                 string dataColLetter = ClosedXML.Excel.XLHelper.GetColumnLetterFromNumber(dataCol);
 
                 // --- Диапазоны 3-47 с формулами SUM/D48 ---
-                string formula1 = $"=SUM({dataColLetter}3:{dataColLetter}14)/{dataColLetter}48";
-                targetWorksheet.Range(3, formulaCol, 14, formulaCol).Merge();
-                targetWorksheet.Cell(3, formulaCol).FormulaA1 = formula1;
+                int formulaGroupIndex = 0;
+                foreach (var range in ranges)
+                {
+                    int startRange = range.Start;
+                    int endRange = range.End;
 
-                string formula2 = $"=SUM({dataColLetter}15:{dataColLetter}21)/{dataColLetter}48";
-                targetWorksheet.Range(15, formulaCol, 21, formulaCol).Merge();
-                targetWorksheet.Cell(15, formulaCol).FormulaA1 = formula2;
+                    // Знаменатель всегда находится в 48-й строке
+                    string formula = $"=SUM({dataColLetter}{startRange}:{dataColLetter}{endRange})/{dataColLetter}{endRow}";
 
-                string formula3 = $"=SUM({dataColLetter}22:{dataColLetter}47)/{dataColLetter}48";
-                targetWorksheet.Range(22, formulaCol, 47, formulaCol).Merge();
-                targetWorksheet.Cell(22, formulaCol).FormulaA1 = formula3;
+                    // Объединяем ячейки в диапазоне
+                    targetWorksheet.Range(startRange, formulaCol, endRange, formulaCol).Merge();
 
-                // Применение форматирования
+                    // Устанавливаем формулу в первую ячейку объединенного диапазона
+                    targetWorksheet.Cell(startRange, formulaCol).FormulaA1 = formula;
+
+                    formulaGroupIndex++;
+                }
+
+                // ---------------------------------------------------------------------------------
+
+                // Применение форматирования (теперь нужно применить его ко всему объединенному диапазону)
                 var formulaRange = targetWorksheet.Range(3, formulaCol, 47, formulaCol);
                 formulaRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 formulaRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                 formulaRange.Style.NumberFormat.Format = "0.00%";
 
-                // 3. Переход к следующему столбцу для данных (пропускаем столбец с формулами)
+                // 3. Переход к следующему столбцу для данных
                 currentTargetColIndex += 2;
+
             }
 
-            // --- ЛОГИКА: ФОРМУЛЫ СУММИРОВАНИЯ В СТОЛБЦЕ B ---
+            // --- ЛОГИКА: ФОРМУЛЫ СУММИРОВАНИЯ В СТОЛБЦЕ B (Сумма по всем филиалам) ---
 
             int startDataRow = 3;
             int endDataRowForSum = 47;
-            int targetSumCol = 2; // Столбец B
+            int targetSumColB = 2; // Столбец B
+            string sourceColLetterB = ClosedXML.Excel.XLHelper.GetColumnLetterFromNumber(targetSumColB); // "B"
+            string denominatorCellB48 = $"{sourceColLetterB}{endRow}"; // B48
 
             for (int row = startDataRow; row <= endDataRowForSum; row++)
             {
@@ -444,7 +571,7 @@ namespace Core.Services
 
                 string sumFormula = $"=SUM({string.Join(",", formulaParts)})";
 
-                var targetCell = targetWorksheet.Cell(row, targetSumCol);
+                var targetCell = targetWorksheet.Cell(row, targetSumColB);
                 targetCell.FormulaA1 = sumFormula;
                 targetCell.Style = targetWorksheet.Cell(row, 1).Style;
                 // УСТАНОВКА ШРИФТА 14
@@ -457,14 +584,62 @@ namespace Core.Services
                 .ToList();
 
             string denominatorSumFormula = $"=SUM({string.Join(",", denominatorFormulaParts)})";
-            targetWorksheet.Cell(endRow, targetSumCol).FormulaA1 = denominatorSumFormula;
-            targetWorksheet.Cell(endRow, targetSumCol).Style = targetWorksheet.Cell(endRow, 1).Style;
+            targetWorksheet.Cell(endRow, targetSumColB).FormulaA1 = denominatorSumFormula;
+            targetWorksheet.Cell(endRow, targetSumColB).Style = targetWorksheet.Cell(endRow, 1).Style;
+
+            // ------------------------------------------------------------------------------
+
+            // --- НОВАЯ ЛОГИКА: ФОРМУЛЫ СУММИРОВАНИЯ ДИАПАЗОНОВ ИЗ СТОЛБЦА B В СТОЛБЕЦ C (ПРОЦЕНТЫ) ---
+
+            int targetRangeSumColC = 3; // Столбец C
+
+            // Применяем стиль к заголовку столбца C (строка 2)
+            var headerCellB = targetWorksheet.Cell(startRow, targetSumColB);
+            var headerCellC = targetWorksheet.Cell(startRow, targetRangeSumColC);
+            // Название столбца C
+            headerCellC.Value = "% от Свода";
+            headerCellC.Style = headerCellB.Style; // Копируем стиль из B2
+
+            // Установка ширины столбца C
+            targetWorksheet.Column(targetRangeSumColC).Width = 14;
+
+            foreach (var range in ranges)
+            {
+                int startRange = range.Start;
+                int endRange = range.End;
+
+                // !!! ИЗМЕНЕНИЕ: ФОРМУЛА С ДЕЛЕНИЕМ НА B48 !!!
+                // Формула: =SUM(B_startRange:B_endRange)/B48
+                string formulaWithDivision = $"=SUM({sourceColLetterB}{startRange}:{sourceColLetterB}{endRange})/{denominatorCellB48}";
+
+                // Объединяем ячейки в диапазоне в столбце C
+                var mergedRange = targetWorksheet.Range(startRange, targetRangeSumColC, endRange, targetRangeSumColC);
+                mergedRange.Merge();
+
+                // Устанавливаем формулу в первую ячейку объединенного диапазона
+                targetWorksheet.Cell(startRange, targetRangeSumColC).FormulaA1 = formulaWithDivision;
+
+                // Копируем стиль из столбца B и центрируем
+                var baseStyle = targetWorksheet.Cell(startRange, targetSumColB).Style;
+
+                mergedRange.Style.Font = baseStyle.Font;
+                mergedRange.Style.Fill = baseStyle.Fill;
+                mergedRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                mergedRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+                // !!! ИЗМЕНЕНИЕ: УСТАНАВЛИВАЕМ ЧИСЛОВОЙ ФОРМАТ КАК ПРОЦЕНТ !!!
+                mergedRange.Style.NumberFormat.Format = "0.00%";
+            }
+
+            // !!! ИЗМЕНЕНИЕ: Добавляем формулу для знаменателя (C48), которая должна быть 100% !!!
+ // Форматируем как 100.00%
+
+            // ------------------------------------------------------------------------------
 
 
-            // --- НОВАЯ ЛОГИКА: УСТАНОВКА ГРАНИЦ ДЛЯ ВСЕЙ ОБЛАСТИ ДАННЫХ ---
+            // --- ЛОГИКА: УСТАНОВКА ГРАНИЦ ДЛЯ ВСЕЙ ОБЛАСТИ ДАННЫХ ---
 
-            // Последний заполненный столбец - это столбец с процентами последнего отчета,
-            // который находится перед текущим (незаполненным) currentTargetColIndex.
+            // Последний заполненный столбец - это столбец с процентами последнего отчета.
             int lastFilledCol = currentTargetColIndex - 1;
             int firstCol = 1; // Столбец А
 
@@ -475,7 +650,7 @@ namespace Core.Services
             fullRangeWithBorders.Style.Border.SetOutsideBorder(XLBorderStyleValues.Thin);
             fullRangeWithBorders.Style.Border.SetInsideBorder(XLBorderStyleValues.Thin);
 
-            // --- КОНЕЦ НОВОЙ ЛОГИКИ ---
+            // --- КОНЕЦ ЛОГИКИ УСТАНОВКИ ГРАНИЦ ---
 
 
             InsertPeriodDescription(resultWorkbook, year, month, null, null);
