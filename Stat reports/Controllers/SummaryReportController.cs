@@ -80,14 +80,13 @@ public class SummaryReportController : Controller
         {
             if (model.IsExtendedReport)
             {
-                // !!! ВЫЗЫВАЕМ НОВЫЙ МЕТОД ДЛЯ РАСШИРЕННОГО ОТЧЕТА !!!
-                mergedExcel = _summaryReportService.MergeSummaryExcelReport(
+                // !!! ВЫЗЫВАЕМ НОВЫЙ МЕТОД ДЛЯ РАСШИРЕННОГО ОТЧЕТА !!!
+                mergedExcel = _summaryReportService.MergeSummaryExcelReport(
                     reports,
                     templatePath,
                     (int)model.Year,
-                    (int)model.Month,
-                    model.SelectedRowIndexes); // <-- ДОБАВЛЕНО: ПЕРЕДАЕМ ВЫБРАННЫЕ ДИАПАЗОНЫ
-                    }
+                    (int)model.Month);
+            }
             else
             {
                 // Вызываем старый метод для отчета с фиксированной структурой
@@ -95,7 +94,7 @@ public class SummaryReportController : Controller
                     reports,
                     templatePath,
                     (int)model.Year,
-                    (int)model.Month,model.SelectedRowIndexes);
+                    (int)model.Month);
             }
 
             // Единая точка возврата File для этого блока

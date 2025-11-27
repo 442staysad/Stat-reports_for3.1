@@ -157,7 +157,7 @@ namespace Core.Services
             {
                 Name = template.Name,
                 TemplateId = templateId,
-                BranchId = branchId,
+                BranchId = deadline.BranchId,
                 UploadedById = uploadedById,
                 FilePath = filePath,
                 UploadDate = DateTime.UtcNow,

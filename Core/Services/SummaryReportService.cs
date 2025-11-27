@@ -27,12 +27,12 @@ namespace Core.Services
             _webHostEnvironment = webHostEnvironment;
         }
         public async Task<List<Report>> GetReportsForSummaryAsync(
-    int templateId,
-    int year,
-    int? month,
-    int? quarter,
-    int? halfYear,
-    List<int> branchIds)
+            int templateId,
+            int year,
+            int? month,
+            int? quarter,
+            int? halfYear,
+            List<int> branchIds)
         {
             var template = await _unitOfWork.ReportTemplates.FindAsync(t => t.Id == templateId);
             if (template == null)
@@ -197,11 +197,7 @@ namespace Core.Services
 
         // --- НОВЫЙ МЕТОД ---
         // Для отчета с фиксированной структурой (копирование столбцов)
-        public byte[] MergeFixedStructureReportsToExcel(List<Report> reports,
-            string templatePath, 
-            int year, 
-            int month,
-            List<int> rowRanges)
+        public byte[] MergeFixedStructureReportsToExcel(List<Report> reports, string templatePath, int year, int month)
         {
 
             // 1. Собираем пути к файлам отчетов
@@ -218,12 +214,12 @@ namespace Core.Services
                 templatePath,
                 year,
                 month,
-                signatureFilePath, rowRanges
+                signatureFilePath
             );
         }
 
         // Новый метод для Сводного/Расширенного отчета (использует ProcessSummaryExcelReport)
-        public byte[] MergeSummaryExcelReport(List<Report> reports, string templatePath, int year, int month, List<int> selectedRowIndexes)
+        public byte[] MergeSummaryExcelReport(List<Report> reports, string templatePath, int year, int month)
         {
             // 1. Собираем пути к файлам отчетов
             var paths = reports.Select(r => r.FilePath).ToList();
@@ -239,7 +235,7 @@ namespace Core.Services
                 templatePath,
                 year,
                 month,
-                signatureFilePath, selectedRowIndexes
+                signatureFilePath
             );
         }
 
