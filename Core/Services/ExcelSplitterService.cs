@@ -471,6 +471,7 @@ namespace Core.Services
                 targetCell.Style = targetWorksheet.Cell(row, 1).Style;
                 // УСТАНОВКА ШРИФТА 14
                 targetCell.Style.Font.FontSize = 14;
+                targetCell.Style.Font.Italic = false;
             }
 
             // Добавляем формулу для знаменателя (B48)
