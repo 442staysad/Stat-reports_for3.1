@@ -278,7 +278,7 @@ namespace Core.Services
 
         public async Task<byte[]> GetReportFileAsync(int reportId)
         {
-            var report = await _unitOfWork.Reports.FindAsync(r => r.Id == reportId);
+            var report = await _unitOfWork.Reports.FindAsync(r => r.Id == reportId,r=>r.Include(b=>b.Branch));
             if (report == null || string.IsNullOrEmpty(report.FilePath))
                 throw new FileNotFoundException("Файл отчета не найден");
 

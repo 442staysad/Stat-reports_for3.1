@@ -145,7 +145,7 @@ namespace Stat_reports.Controllers
             var report = await _reportService.GetReportByIdAsync(reportId);
             if (report == null || string.IsNullOrEmpty(report.FilePath))
                 return NotFound();
-
+            
             var bytes = await _fileService.GetFileAsync(report.FilePath);
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         Path.GetFileName(report.FilePath));
@@ -413,11 +413,12 @@ namespace Stat_reports.Controllers
         public async Task<IActionResult> DownloadReport(int reportId, string reportname)
         {
             var fileBytes = await _reportService.GetReportFileAsync(reportId);
-
+            var report=await _reportService.GetReportByIdAsync(reportId);
+            var branch = await _branchService.GetBranchByIdAsync(report.BranchId);
             if (fileBytes == null)
                 return NotFound();
 
-            return File(fileBytes, "application/octet-stream", $"{reportname}.xlsx");
+            return File(fileBytes, "application/octet-stream", $"{branch.Shortname}_{reportname}.xlsx");
         }
 
         public async Task<IActionResult> ReportArchive(string? name, int? templateId,
