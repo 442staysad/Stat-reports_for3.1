@@ -254,49 +254,62 @@ namespace Core.Services
             }
         }
 
-        public byte[] ProcessFixedStructureReport(List<string> filePaths, string templatePath, int year, int month, string signatureFilePath)
+        public byte[] ProcessFixedStructureReport(List<(string FilePath, string Shortname)> reportData, 
+            string templatePath, int year, 
+            int month, string signatureFilePath)
         {
             using var resultWorkbook = new XLWorkbook(templatePath);
             var targetWorksheet = resultWorkbook.Worksheet(1);
 
-            int startRow = 2;
+            int headerRow = 2;       // Строка для вставки Shortname (D2, E2, F2...)
+            int dataStartRow = 3;    // Строка, с которой начинаются данные (строки 3-48)
             int endRow = 48;
-            int sourceColIndex = 3;   // Столбец D
-            int targetColIndex = 4;   // Столбец D
+            int sourceColIndex = 3;  // Столбец C исходного файла
+            int targetColIndex = 4;  // Столбец D результирующего файла
 
-
-            // Если список файлов пуст, возвращаем пустой шаблон.
-            if (filePaths == null || filePaths.Count == 0)
+            if (reportData == null || reportData.Count == 0)
             {
                 using var tempMs = new MemoryStream();
                 resultWorkbook.SaveAs(tempMs);
                 return tempMs.ToArray();
             }
 
-            foreach (var filePath in filePaths)
+            foreach (var data in reportData) // <--- ИСПОЛЬЗУЕМ КОРТЕЖИ
             {
+                var filePath = data.FilePath;
+                var shortname = data.Shortname;
 
                 if (!File.Exists(filePath))
                 {
                     continue;
                 }
 
+                // --- НОВАЯ ЛОГИКА: ВСТАВКА SHORTNAME В ЗАГОЛОВОК (Строка 2) ---
+                var headerCell = targetWorksheet.Cell(headerRow, targetColIndex);
+                headerCell.Value = shortname;
+                headerCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                headerCell.Style.Font.Bold = true;
+                // --- КОНЕЦ НОВОЙ ЛОГИКИ ---
+
                 using var sourceWorkbook = new XLWorkbook(filePath);
                 var sourceWorksheet = sourceWorkbook.Worksheet(1);
 
                 if (sourceWorksheet == null) continue;
 
-                for (int row = startRow; row <= endRow; row++)
+                // Копируем данные, начиная с dataStartRow (строка 3), чтобы не перезаписать заголовок в строке 2
+                for (int row = dataStartRow; row <= endRow; row++)
                 {
                     var sourceCell = sourceWorksheet.Cell(row, sourceColIndex);
                     var sourceValue = sourceCell.Value;
-
 
                     if (!sourceValue.IsBlank)
                     {
                         var targetCell = targetWorksheet.Cell(row, targetColIndex);
                         targetCell.Value = sourceValue;
                         targetCell.Style = sourceCell.Style;
+
+                        targetCell.Style.Font.FontName = "Times New Roman";
+                        targetCell.Style.Font.FontSize = 14;
                     }
                 }
 
@@ -312,7 +325,7 @@ namespace Core.Services
             int firstCol = 1; // Столбец А
 
             // Создаем диапазон, например, от A2 до (последний столбец)48
-            var fullRangeWithBorders = targetWorksheet.Range(startRow, firstCol, endRow, lastFilledCol);
+            var fullRangeWithBorders = targetWorksheet.Range(headerRow, firstCol, endRow, lastFilledCol);
 
             // Устанавливаем тонкие границы для всего диапазона (снаружи и внутри)
             fullRangeWithBorders.Style.Border.SetOutsideBorder(XLBorderStyleValues.Thin);
@@ -330,38 +343,45 @@ namespace Core.Services
         }
 
         public byte[] ProcessSummaryExcelReport(
-            List<string> filePaths,
+            List<(string FilePath, string Shortname)> reportData, // <--- ИЗМЕНЕННАЯ СИГНАТУРА
             string templatePath,
             int year,
             int month,
             string signatureFilePath)
         {
-            // Предполагается, что у вас есть using ClosedXML.Excel;
             using var resultWorkbook = new XLWorkbook(templatePath);
             var targetWorksheet = resultWorkbook.Worksheet(1);
 
-            int startRow = 2;  // Строка заголовка / начала данных
-            int endRow = 48;   // Строка знаменателя
-            int sourceColIndex = 3; // Столбец D в исходном отчете
+            int startRow = 2;     // Строка заголовка (R2)
+            int dataStartRow = 3; // Строка, с которой начинаются данные (R3-R48)
+            int endRow = 48;      // Строка знаменателя
+            int sourceColIndex = 3; // Столбец C в исходном отчете (данные)
 
-            // Переменная для отслеживания текущего столбца вставки данных
             int currentTargetColIndex = 4;
-
-            // Список для сохранения индексов столбцов, куда были вставлены данные (D, F, H, ...)
             var dataColumnIndexes = new List<int>();
 
-            // Если список файлов пуст, вернуть пустой шаблон
-            if (filePaths == null || filePaths.Count == 0)
+            // Использование нового списка кортежей
+            if (reportData == null || reportData.Count == 0)
             {
                 using var tempMs = new MemoryStream();
                 resultWorkbook.SaveAs(tempMs);
                 return tempMs.ToArray();
             }
 
-            foreach (var filePath in filePaths)
+            foreach (var data in reportData) // <--- ИСПОЛЬЗУЕМ КОРТЕЖИ
             {
+                var filePath = data.FilePath;
+                var shortname = data.Shortname; // Получаем Shortname
+
                 if (!File.Exists(filePath))
                     continue;
+
+                // --- НОВАЯ ЛОГИКА: ВСТАВКА SHORTNAME В ЗАГОЛОВОК (Строка 2) ---
+                var headerCell = targetWorksheet.Cell(startRow, currentTargetColIndex);
+                headerCell.Value = shortname;
+                headerCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                headerCell.Style.Font.Bold = true;
+                // --- КОНЕЦ НОВОЙ ЛОГИКИ ---
 
                 using var sourceWorkbook = new XLWorkbook(filePath);
                 var sourceWorksheet = sourceWorkbook.Worksheet(1);
@@ -369,39 +389,41 @@ namespace Core.Services
                 if (sourceWorksheet == null)
                     continue;
 
-                // !!! Запоминаем индекс столбца с данными, перед тем как его сдвинуть !!!
+                // Запоминаем индекс столбца с данными
                 dataColumnIndexes.Add(currentTargetColIndex);
 
-                // 1. Копирование данных
-                for (int row = startRow; row <= endRow; row++)
+                // 1. Копирование данных (начинаем с 3-й строки, чтобы не перезаписать заголовок)
+                for (int row = dataStartRow; row <= endRow; row++) 
                 {
                     var sourceCell = sourceWorksheet.Cell(row, sourceColIndex);
                     var sourceValue = sourceCell.Value;
 
-                    // Копируем значение и стиль, включая заголовок (R2) и знаменатель (R48)
-                    if (!sourceValue.IsBlank || row == startRow)
+                    // Копируем значение и стиль
+                    if (!sourceValue.IsBlank)
                     {
                         var targetCell = targetWorksheet.Cell(row, currentTargetColIndex);
                         targetCell.Value = sourceValue;
                         targetCell.Style = sourceCell.Style;
+
+                        targetCell.Style.Font.FontName = "Times New Roman";
+                        targetCell.Style.Font.FontSize = 14;
                     }
                 }
 
                 // 2. Вставка заголовка и формул в следующий столбец (проценты)
                 int dataCol = currentTargetColIndex;
-                int formulaCol = currentTargetColIndex + 1; // Столбец для формул (E, G, I, ...)
+                int formulaCol = currentTargetColIndex + 1;
 
-                // Установка ширины столбца для процентов
                 targetWorksheet.Column(formulaCol).Width = 12;
 
-                // Получаем значение заголовка из текущего столбца данных (R2)
+                // Получаем значение заголовка (наш Shortname) из текущего столбца данных (R2)
                 var dataHeaderCell = targetWorksheet.Cell(startRow, dataCol);
                 var formulaHeaderCell = targetWorksheet.Cell(startRow, formulaCol);
 
-                // Копируем текст и добавляем "%"
+                // Копируем текст (Shortname) и добавляем "%"
                 formulaHeaderCell.Value = $"{dataHeaderCell.GetText()} %";
 
-                // Копируем стиль заголовка (шрифт, цвет и т.д.)
+                // Копируем стиль заголовка
                 formulaHeaderCell.Style = dataHeaderCell.Style;
 
                 // Получаем букву столбца, куда были скопированы данные (D, F, H, ...)

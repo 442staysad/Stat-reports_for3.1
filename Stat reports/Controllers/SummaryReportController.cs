@@ -39,7 +39,7 @@ public class SummaryReportController : Controller
 
         return View(model);
     }
-    //как же мне она надоела эта тупая назойливая самовлюбленная начальница
+    
     [HttpPost]
     public async Task<IActionResult> Summary(SummaryReportGenerationViewModel model)
     {

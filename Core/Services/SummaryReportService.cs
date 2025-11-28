@@ -199,18 +199,22 @@ namespace Core.Services
         // Для отчета с фиксированной структурой (копирование столбцов)
         public byte[] MergeFixedStructureReportsToExcel(List<Report> reports, string templatePath, int year, int month)
         {
-
-            // 1. Собираем пути к файлам отчетов
-            var paths = reports.Select(r => r.FilePath).ToList();
+            // 1. Собираем список кортежей (FilePath, Shortname)
+            var dataForSplitter = reports
+                .Where(r => r.Branch != null) // Фильтруем отчеты, у которых загружен филиал
+                .Select(r => (
+                    FilePath: r.FilePath,
+                    Shortname: r.Branch.Shortname ?? "Н/Д" // Используем Shortname, или "Н/Д" как заглушку
+                ))
+                .ToList();
 
             // 2. Путь к файлу подписи
             string wwwRootPath = _webHostEnvironment.WebRootPath;
             string signatureFilePath = Path.Combine(wwwRootPath, "docs", "Подпись.xlsx");
 
-            // 3. Вызываем специальный метод в сплиттере
-            // Передаем year и month, так как отчет ежемесячный
+            // 3. Вызываем специальный метод, передавая новый список кортежей
             return _excelSplitter.ProcessFixedStructureReport(
-                paths,
+                dataForSplitter, // <--- ИЗМЕНЕНИЕ: Передача List<(string FilePath, string Shortname)>
                 templatePath,
                 year,
                 month,
@@ -219,19 +223,25 @@ namespace Core.Services
         }
 
         // Новый метод для Сводного/Расширенного отчета (использует ProcessSummaryExcelReport)
+       
         public byte[] MergeSummaryExcelReport(List<Report> reports, string templatePath, int year, int month)
         {
-            // 1. Собираем пути к файлам отчетов
-            var paths = reports.Select(r => r.FilePath).ToList();
+            // 1. Собираем список кортежей (FilePath, Shortname)
+            var dataForSplitter = reports
+                .Where(r => r.Branch != null) // Убеждаемся, что филиал загружен
+                .Select(r => (
+                    FilePath: r.FilePath,
+                    Shortname: r.Branch.Shortname ?? "Н/Д" // Получаем Shortname
+                ))
+                .ToList();
 
             // 2. Путь к файлу подписи
             string wwwRootPath = _webHostEnvironment.WebRootPath;
             string signatureFilePath = Path.Combine(wwwRootPath, "docs", "Подпись.xlsx");
 
-            // 3. Вызываем новый специальный метод в сплиттере
-            // Этот метод реализует логику "через одну ячейку" (С, Е, G...)
+            // 3. Вызываем специальный метод, передавая новый список кортежей
             return _excelSplitter.ProcessSummaryExcelReport(
-                paths,
+                dataForSplitter, // <--- ИЗМЕНЕНИЕ: Передача List<(string FilePath, string Shortname)>
                 templatePath,
                 year,
                 month,

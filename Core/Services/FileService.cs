@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Linq;
-using Core.Interfaces; // Добавьте, если используете LINQ
+using Core.Interfaces;
+using System.Collections.Generic; // Добавьте, если используете LINQ
 //using NPOI.SS.Util; // Might be needed for advanced cell copying
 
 namespace Infrastructure.Services
@@ -14,7 +15,7 @@ namespace Infrastructure.Services
     public class FileService : IFileService
     {
         private readonly string _rootPath;
-
+        private readonly Dictionary<short, ICellStyle> _cellStyleMap = new Dictionary<short, ICellStyle>();
         public FileService()
         {
             _rootPath = Path.Combine(Directory.GetCurrentDirectory(), "Reports");
@@ -154,6 +155,11 @@ namespace Infrastructure.Services
                                                 // Обработка других типов, если необходимо
                                                 break;
                                         }
+                                        if (sourceCell.CellStyle != null)
+                                        {
+                                            // Передаем ИСХОДНУЮ КНИГУ (hssfWorkbook) и ЦЕЛЕВУЮ КНИГУ (targetWorkbook)
+                                            destCell.CellStyle = CopyCellStyle(hssfWorkbook, targetWorkbook, sourceCell.CellStyle);
+                                        }
                                         // Копирование стилей ячеек, шрифтов и т.д. требует отдельной логики
                                         // destCell.CellStyle = sourceCell.CellStyle; // Простое присвоение может не работать с разными книгами
                                         // Придется маппировать или копировать стили явно
@@ -169,7 +175,7 @@ namespace Infrastructure.Services
                             }
                             targetWorkbook = targetWorkbook; // Теперь targetWorkbook - это новая книга XLSX с данными
                                                              // Закрываем исходную книгу, она больше не нужна
-                            hssfWorkbook.Close(); // Dispose the original workbook
+                            hssfWorkbook.Close(); 
 
                         }
                         else if (workbook is XSSFWorkbook xssfWorkbook)
@@ -205,9 +211,71 @@ namespace Infrastructure.Services
             }
         }
 
+        private ICellStyle CopyCellStyle(IWorkbook sourceWorkbook, IWorkbook targetWorkbook, ICellStyle sourceStyle)
+        {
+            if (sourceStyle == null) return null;
+
+            // Идентификатор стиля в исходной книге (используется для кеширования)
+            short sourceStyleIndex = sourceStyle.Index;
+
+            // 1. Проверяем кеш: если стиль уже был скопирован, возвращаем его
+            if (_cellStyleMap.ContainsKey(sourceStyleIndex))
+            {
+                return _cellStyleMap[sourceStyleIndex];
+            }
+
+            // 2. Создаем новый стиль в целевой книге
+            ICellStyle newStyle = targetWorkbook.CreateCellStyle();
+
+            // 3. Копируем все основные свойства стиля
+            newStyle.Alignment = sourceStyle.Alignment;
+            newStyle.VerticalAlignment = sourceStyle.VerticalAlignment;
+            newStyle.BorderBottom = sourceStyle.BorderBottom;
+            newStyle.BorderLeft = sourceStyle.BorderLeft;
+            newStyle.BorderRight = sourceStyle.BorderRight;
+            newStyle.BorderTop = sourceStyle.BorderTop;
+            newStyle.BottomBorderColor = sourceStyle.BottomBorderColor;
+            newStyle.LeftBorderColor = sourceStyle.LeftBorderColor;
+            newStyle.RightBorderColor = sourceStyle.RightBorderColor;
+            newStyle.TopBorderColor = sourceStyle.TopBorderColor;
+            newStyle.FillForegroundColor = sourceStyle.FillForegroundColor;
+            newStyle.FillBackgroundColor = sourceStyle.FillBackgroundColor;
+            newStyle.FillPattern = sourceStyle.FillPattern;
+            newStyle.DataFormat = sourceStyle.DataFormat;
+            newStyle.IsHidden = sourceStyle.IsHidden;
+            newStyle.IsLocked = sourceStyle.IsLocked;
+            newStyle.Indention = sourceStyle.Indention;
+            newStyle.WrapText = sourceStyle.WrapText;
+
+            // 4. Копируем ШРИФТ (ИСПРАВЛЕНИЕ InvalidCastException)
+            // Получаем шрифт, используя ИСХОДНУЮ книгу (HSSFWorkbook)
+            IFont sourceFont = sourceStyle.GetFont(sourceWorkbook);
+
+            if (sourceFont != null)
+            {
+                // Создаем новый шрифт в ЦЕЛЕВОЙ книге (XSSFWorkbook) на основе свойств исходного шрифта
+                IFont newFont = targetWorkbook.CreateFont();
+                newFont.IsBold = sourceFont.IsBold;
+                newFont.Color = sourceFont.Color;
+                newFont.FontHeightInPoints = sourceFont.FontHeightInPoints;
+                newFont.FontName = sourceFont.FontName;
+                newFont.IsItalic = sourceFont.IsItalic;
+                newFont.IsStrikeout = sourceFont.IsStrikeout;
+                newFont.TypeOffset = sourceFont.TypeOffset;
+                newFont.Underline = sourceFont.Underline;
+
+                newStyle.SetFont(newFont);
+            }
+
+            // 5. Сохраняем новый стиль в кеше перед возвратом
+            _cellStyleMap.Add(sourceStyleIndex, newStyle);
+
+            return newStyle;
+        }
+
         public async Task<byte[]> GetFileAsync(string filePath)
         {
-            // Этот метод остается прежним, он просто читает байты по пути
+           
             var fullPath = Path.Combine(_rootPath, filePath);
             if (!File.Exists(fullPath))
                 return null;
